@@ -20,7 +20,20 @@
     /* Landing header */
     .hero{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--rule);padding-bottom:18px}
     .hero img{width:120px;height:120px;object-fit:contain}
-    .hero h1{font-family:var(--heading-font);font-size:44px;line-height:1.1;margin:0;text-align:center}
+    .hero h1{
+      font-family:var(--heading-font);
+      font-size:44px;
+      line-height:1.1;
+      margin:0;
+      text-align:center;
+      letter-spacing:-0.5px;
+    }
+    .hero h1 .num{
+      font-variant-numeric:tabular-nums;
+      position:relative;
+      top:2px; /* adjust if needed */
+      display:inline-block;
+    }
 
     /* Tabs */
     .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px;border-bottom:1px solid var(--rule);padding-bottom:10px}
@@ -49,16 +62,15 @@
   <div class="page">
     <!-- Big logo + title -->
     <div class="hero">
-      <!-- If your file is named “polychain logo.gif” (with a space), keep the %20 below -->
-      <img src="assets/polychain%20logo.gif" alt="Polychain logo">
-      <h1>Polychain F1 Dashboard</h1>
+      <img src="assets/polychain-logo.gif" alt="Polychain logo">
+      <h1>Polychain F<span class="num">1</span> Dashboard</h1>
     </div>
 
     <!-- Tabs -->
     <nav class="tabs" id="tabs">
       <a href="#pump" class="active">Pump</a>
-      <a href="#overview">Overview</a>
-      <a href="#onchain">On-chain</a>
+      <a href="#DATs">DATs</a>
+      <a href="#HYPE">HYPE</a>
       <a href="#risk">Risk</a>
     </nav>
 
@@ -93,19 +105,19 @@
     </section>
 
     <!-- Placeholder tabs you can fill later -->
-    <section id="pane-overview" class="tabpane" role="tabpanel" aria-labelledby="tab-overview">
-      <h2>Overview (placeholder)</h2>
-      <p>Top KPIs for Polychain F1 will go here.</p>
+    <section id="pane-DATs" class="tabpane" role="tabpanel" aria-labelledby="tab-DATs">
+      <h2>DATs (placeholder)</h2>
+      <p>DAT info will go here.</p>
     </section>
 
-    <section id="pane-onchain" class="tabpane" role="tabpanel" aria-labelledby="tab-onchain">
-      <h2>On-chain (placeholder)</h2>
-      <p>Wallet flows, contract stats, DEX metrics, etc.</p>
+    <section id="pane-HYPE" class="tabpane" role="tabpanel" aria-labelledby="tab-HYPE">
+      <h2>HYPE (placeholder)</h2>
+      <p>All things HYPE will go here.</p>
     </section>
 
     <section id="pane-risk" class="tabpane" role="tabpanel" aria-labelledby="tab-risk">
       <h2>Risk (placeholder)</h2>
-      <p>DD/volatility, VaR/tail metrics, alerts…</p>
+      <p>XYZ.</p>
     </section>
   </div>
 
