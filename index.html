@@ -29,6 +29,7 @@
       font-family:var(--heading-font);
       font-size:44px; line-height:1.1; margin:0; text-align:center; letter-spacing:-0.5px;
     }
+    /* Align the “1” in F1 with the F cap height */
     .f1{ display:inline-flex; align-items:flex-end; }
     .f1 .f{ font-size:1em; line-height:1; }
     .f1 .one{
@@ -51,14 +52,14 @@
     /* Section headings + canvases */
     h2{
       font-family:var(--heading-font);
-      font-size:22px;              /* bigger */
+      font-size:22px;            /* larger */
       font-weight:700;
       text-align:center;
       margin:22px 0 8px;
     }
     canvas{max-width:100%; height:420px; margin:0 auto 30px; display:block; background:#fff;}
 
-    /* Range toolbar */
+    /* Range toolbar (centered under titles) */
     .toolbar{
       display:flex; justify-content:center; gap:10px; margin:8px 0 16px;
     }
@@ -67,6 +68,44 @@
       padding:6px 10px; border-radius:18px; font:600 13px/1 var(--body-font); cursor:pointer;
     }
     .toolbar button.on{background:#111; color:#fff;}
+
+    /* Chart + stats layout */
+    .chart-row{
+      display:grid;
+      grid-template-columns: 1fr 280px;
+      gap:24px;
+      align-items:start;
+      margin: 18px 0 36px;
+    }
+    @media (max-width: 1000px){
+      .chart-row{ grid-template-columns: 1fr; }
+    }
+    .statbox{
+      border:1px solid var(--rule);
+      border-radius:12px;
+      padding:12px;
+      background:#fff;
+    }
+    .statbox h3{
+      margin:0 0 8px;
+      font-family: var(--heading-font);
+      font-size:16px;
+      text-align:left;
+    }
+    .statbox table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:14px;
+    }
+    .statbox th, .statbox td{
+      padding:6px 6px;
+      border-bottom:1px solid #f0f0f0;
+      text-align:right;
+    }
+    .statbox th:first-child, .statbox td:first-child{ text-align:left; }
+    .badge-up{ color:#0a7a3c; font-weight:600; }
+    .badge-down{ color:#b21c1c; font-weight:600; }
+    .muted{ color:#777; font-size:12px; }
 
     /* Tab panes */
     .tabpane{display:none;}
@@ -91,32 +130,50 @@
 
     <!-- Pump tab -->
     <section id="pane-pump" class="tabpane active">
-      <h2>PUMP — Price vs Fees</h2>
-      <div class="toolbar" data-for="chart">
-        <button class="on" data-range="ALL">All</button>
-        <button data-range="3M">3M</button>
-        <button data-range="1M">1M</button>
-        <button data-range="1W">1W</button>
+      <!-- Fees -->
+      <div class="chart-row">
+        <div>
+          <h2>PUMP — Price vs Fees</h2>
+          <div class="toolbar" data-for="chart">
+            <button class="on" data-range="ALL">All</button>
+            <button data-range="3M">3M</button>
+            <button data-range="1M">1M</button>
+            <button data-range="1W">1W</button>
+          </div>
+          <canvas id="chart"></canvas>
+        </div>
+        <aside class="statbox" id="stats-chart"></aside>
       </div>
-      <canvas id="chart"></canvas>
 
-      <h2>PUMP — Price vs Revenue</h2>
-      <div class="toolbar" data-for="chart-revenue">
-        <button class="on" data-range="ALL">All</button>
-        <button data-range="3M">3M</button>
-        <button data-range="1M">1M</button>
-        <button data-range="1W">1W</button>
+      <!-- Revenue -->
+      <div class="chart-row">
+        <div>
+          <h2>PUMP — Price vs Revenue</h2>
+          <div class="toolbar" data-for="chart-revenue">
+            <button class="on" data-range="ALL">All</button>
+            <button data-range="3M">3M</button>
+            <button data-range="1M">1M</button>
+            <button data-range="1W">1W</button>
+          </div>
+          <canvas id="chart-revenue"></canvas>
+        </div>
+        <aside class="statbox" id="stats-chart-revenue"></aside>
       </div>
-      <canvas id="chart-revenue"></canvas>
 
-      <h2>PUMP — Price vs Buybacks (USD)</h2>
-      <div class="toolbar" data-for="chart-buybacks">
-        <button class="on" data-range="ALL">All</button>
-        <button data-range="3M">3M</button>
-        <button data-range="1M">1M</button>
-        <button data-range="1W">1W</button>
+      <!-- Buybacks -->
+      <div class="chart-row">
+        <div>
+          <h2>PUMP — Price vs Buybacks (USD)</h2>
+          <div class="toolbar" data-for="chart-buybacks">
+            <button class="on" data-range="ALL">All</button>
+            <button data-range="3M">3M</button>
+            <button data-range="1M">1M</button>
+            <button data-range="1W">1W</button>
+          </div>
+          <canvas id="chart-buybacks"></canvas>
+        </div>
+        <aside class="statbox" id="stats-chart-buybacks"></aside>
       </div>
-      <canvas id="chart-buybacks"></canvas>
     </section>
 
     <!-- DATs -->
@@ -172,9 +229,9 @@
     })();
   </script>
 
+  <!-- Charts + stats logic -->
   <script src="script.js"></script>
 </body>
 </html>
-
 
 
