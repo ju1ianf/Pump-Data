@@ -9,7 +9,7 @@ function rgba(hex, a = 0.15) {
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
   leftColor = "#54d794",   // default pumpfun
-  rightColor = "#1a4846"   // default dark green
+  rightColor = "#FFFFFF"   // default white
 }) {
   const res = await fetch(file, { cache: "no-store" });
   const { series } = await res.json();
@@ -82,7 +82,7 @@ makeDualAxis({
   leftKey: "price", rightKey: "fees",
   leftLabel: "Price (USD)", rightLabel: "Fees",
   leftColor: "#54d794",   // pumpfun green
-  rightColor: "#1a4846"   // Dark green
+  rightColor: "#FFFFFF"   // White
 });
 
 makeDualAxis({
@@ -91,7 +91,7 @@ makeDualAxis({
   leftKey: "price", rightKey: "revenue",
   leftLabel: "Price (USD)", rightLabel: "Revenue",
   leftColor: "#54d794",   // pumpfun green
-  rightColor: "#1a4846"   // dark green
+  rightColor: "#FFFFFF"   // White
 });
 
 makeDualAxis({
@@ -102,7 +102,7 @@ makeDualAxis({
   leftLabel: "Price (USD)",
   rightLabel: "Buybacks (USD)",
   leftColor: "#54d794",
-  rightColor: "#1a4846"
+  rightColor: "#FFFFFF"
 });
 
 
