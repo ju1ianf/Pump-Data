@@ -6,6 +6,9 @@
   const price  = series.map(d => d.price);
   const fees   = series.map(d => d.fees);
 
+  const fmtUSD  = v => v == null ? "–" : `$${v.toLocaleString(undefined,{ maximumFractionDigits:6 })}`;
+  const fmtBig  = v => v == null ? "–" : v.toLocaleString();
+
   const ctx = document.getElementById("chart").getContext("2d");
   new Chart(ctx, {
     type: "line",
@@ -17,12 +20,24 @@
       ]
     },
     options: {
-      interaction: { mode:"index", intersect:false },
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "top" },
+        tooltip: {
+          callbacks: {
+            label: c => c.dataset.label === "Price (USD)"
+              ? `${c.dataset.label}: ${fmtUSD(c.parsed.y)}`
+              : `${c.dataset.label}: ${fmtBig(c.parsed.y)}`
+          }
+        }
+      },
       scales: {
-        x: { type:"time", time:{ unit:"day" } },
-        yL: { position:"left" },
-        yR: { position:"right", grid:{ drawOnChartArea:false } }
+        x: { type: "time", time: { unit: "day" } },
+        yL: { position: "left",  ticks: { callback: v => `$${Number(v).toFixed(3)}` } },
+        yR: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => Number(v).toLocaleString() } }
       }
     }
   });
 })();
+
