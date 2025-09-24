@@ -2,19 +2,28 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>PUMP — Price vs Fees</title>
+  <title>PUMP — Dashboards</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <style>
     body { background:#0d1117; color:#e6edf3; font:14px system-ui; }
     h1 { text-align:center; margin:18px 0; }
-    canvas { max-width: 1000px; height: 480px; margin: 0 auto; display:block;
+    h2 { text-align:center; margin:12px 0; font-size:16px; }
+    canvas { max-width: 1000px; height: 480px; margin: 0 auto 40px; display:block;
              background:#161b22; padding:12px; border-radius:12px; }
   </style>
 </head>
 <body>
-  <h1>PUMP — Price vs Fees</h1>
+  <h1>PUMP — Dashboards</h1>
+
+  <h2>PUMP — Price vs Fees</h2>
   <canvas id="chart"></canvas>
+
+  <!-- NEW -->
+  <h2>PUMP — Price vs Revenue</h2>
+  <canvas id="chart-revenue"></canvas>
+  <!-- /NEW -->
+
   <script src="script.js"></script>
 </body>
 </html>
