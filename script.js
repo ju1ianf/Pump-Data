@@ -108,8 +108,8 @@ async function makeDualAxis({
       labels,
       datasets: [
         {
-          // LEFT axis (non-price) — stays BLACK
-          label: rightLabel,        // <— we’ll draw non-price second below; flip labels to keep legend order if you like
+          // LEFT axis = non-price (black)
+          label: rightLabel,
           data: dataR,
           yAxisID: "yL",
           tension: .25,
@@ -120,7 +120,7 @@ async function makeDualAxis({
           fill: false
         },
         {
-          // RIGHT axis (price) — stays GREEN
+          // RIGHT axis = price (green)
           label: leftLabel,
           data: dataL,
           yAxisID: "yR",
@@ -145,19 +145,19 @@ async function makeDualAxis({
               const v = c.parsed.y;
               if (/price/i.test(label))
                 return `${label}: $${v?.toLocaleString(undefined, { maximumFractionDigits: 6 })}`;
-              return `${label}: ${v?.toLocaleString()}`;
+              return `${label}: $${v?.toLocaleString()}`; // add $ to non-price values too
             }
           }
         }
       },
       scales: {
         x: { type: "time", time: { unit: "day" } },
-        // LEFT axis for non-price values (fees/revenue/buybacks)
+        // LEFT axis = non-price (dollar sign added)
         yL: {
           position: "left",
-          ticks: { callback: v => Number(v).toLocaleString() }
+          ticks: { callback: v => `$${Number(v).toLocaleString()}` }
         },
-        // RIGHT axis for Price (USD)
+        // RIGHT axis = price
         yR: {
           position: "right",
           grid: { drawOnChartArea: false },
@@ -179,8 +179,8 @@ async function makeDualAxis({
       const subset = filterByRange(series, token);
 
       chart.data.labels = subset.map(d => d.date);
-      chart.data.datasets[0].data = subset.map(d => d[rightKey]); // non-price on LEFT
-      chart.data.datasets[1].data = subset.map(d => d[leftKey]);  // price on RIGHT
+      chart.data.datasets[0].data = subset.map(d => d[rightKey]); // non-price left
+      chart.data.datasets[1].data = subset.map(d => d[leftKey]);  // price right
       chart.update();
     });
   }
@@ -192,7 +192,6 @@ async function makeDualAxis({
 window.__charts = {};
 
 (async () => {
-  // 1) Price vs Fees
   window.__charts.pf = await makeDualAxis({
     el: "chart",
     file: "data/pump.json",
@@ -201,7 +200,6 @@ window.__charts = {};
     statsId: "stats-chart"
   });
 
-  // 2) Price vs Revenue
   window.__charts.pr = await makeDualAxis({
     el: "chart-revenue",
     file: "data/pump_price_revenue.json",
@@ -210,7 +208,6 @@ window.__charts = {};
     statsId: "stats-chart-rev"
   });
 
-  // 3) Price vs Buybacks (USD)
   window.__charts.pb = await makeDualAxis({
     el: "chart-buybacks",
     file: "data/pump_price_buybacks_usd.json",
@@ -219,6 +216,7 @@ window.__charts = {};
     statsId: "stats-chart-bb"
   });
 })();
+
 
 
 
