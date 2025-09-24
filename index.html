@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Polychain F1 — Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Libre+Baskerville&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Libre+Baskerville&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <style>
@@ -13,69 +13,84 @@
       --body-font:"Libre Baskerville", Georgia, "Times New Roman", serif;
       --tab:#111; --tabOff:#888; --tabBg:#fff;
     }
-    html,body{margin:0;padding:0;background:#fff;color:var(--ink);
-      font-family:var(--body-font);font-size:16px;line-height:1.5}
-    .page{max-width:1100px;margin:28px auto;padding:28px;border:4px solid #000;box-sizing:border-box}
+    html,body{
+      margin:0; padding:0; background:#fff; color:var(--ink);
+      font-family:var(--body-font); font-size:16px; line-height:1.5;
+    }
+    .page{max-width:1100px; margin:28px auto; padding:28px; border:4px solid #000; box-sizing:border-box;}
 
-    /* Landing header */
-    .hero{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--rule);padding-bottom:18px}
-    .hero img{width:120px;height:120px;object-fit:contain}
+    /* Header */
+    .hero{
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      margin-bottom:18px; border-bottom:1px solid var(--rule); padding-bottom:18px;
+    }
+    .hero img{width:120px; height:120px; object-fit:contain;}
     .hero h1{
       font-family:var(--heading-font);
-      font-size:44px;
-      line-height:1.1;
-      margin:0;
-      text-align:center;
-      letter-spacing:-0.5px;
+      font-size:44px; line-height:1.1; margin:0; text-align:center; letter-spacing:-0.5px;
     }
-    .hero h1 .num{
-      font-variant-numeric:tabular-nums;
-      position:relative;
-      top:2px; /* adjust if needed */
-      display:inline-block;
+    .f1{ display:inline-flex; align-items:flex-end; }
+    .f1 .f{ font-size:1em; line-height:1; }
+    .f1 .one{
+      font-variant-numeric: lining-nums tabular-nums;
+      display:inline-block; font-size:1.08em; line-height:1; position:relative; top:1px;
     }
 
     /* Tabs */
-    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px;border-bottom:1px solid var(--rule);padding-bottom:10px}
+    .tabs{
+      display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 18px;
+      border-bottom:1px solid var(--rule); padding-bottom:10px;
+    }
     .tabs a{
       text-decoration:none; color:var(--tabOff); background:var(--tabBg);
       border:1px solid var(--tabOff); padding:6px 12px; border-radius:18px;
       font:600 13px/1 var(--body-font);
     }
-    .tabs a.active{color:#fff;background:var(--tab);border-color:var(--tab)}
+    .tabs a.active{color:#fff; background:var(--tab); border-color:var(--tab);}
 
     /* Section headings + canvases */
-    h2{font-family:var(--heading-font);font-size:18px;text-align:center;margin:22px 0 10px}
-    canvas{max-width:100%;height:420px;margin:0 auto 30px;display:block;background:#fff}
+    h2{
+      font-family:var(--heading-font);
+      font-size:22px;              /* bigger */
+      font-weight:700;
+      text-align:center;
+      margin:22px 0 8px;
+    }
+    canvas{max-width:100%; height:420px; margin:0 auto 30px; display:block; background:#fff;}
 
     /* Range toolbar */
-    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:8px 0 16px}
-    .toolbar button{appearance:none;border:1px solid #111;background:#fff;color:#111;padding:6px 10px;border-radius:18px;font:600 13px/1 var(--body-font);cursor:pointer}
-    .toolbar button.on{background:#111;color:#fff}
+    .toolbar{
+      display:flex; justify-content:center; gap:10px; margin:8px 0 16px;
+    }
+    .toolbar button{
+      appearance:none; border:1px solid #111; background:#fff; color:#111;
+      padding:6px 10px; border-radius:18px; font:600 13px/1 var(--body-font); cursor:pointer;
+    }
+    .toolbar button.on{background:#111; color:#fff;}
 
     /* Tab panes */
-    .tabpane{display:none}
-    .tabpane.active{display:block}
+    .tabpane{display:none;}
+    .tabpane.active{display:block;}
   </style>
 </head>
 <body>
   <div class="page">
-    <!-- Big logo + title -->
+    <!-- Logo + title -->
     <div class="hero">
-      <img src="assets/polychain-logo.gif" alt="Polychain logo">
-      <h1>Polychain F<span class="num">1</span> Dashboard</h1>
+      <img src="assets/polychain-logo.gif" alt="Polychain logo" />
+      <h1>Polychain <span class="f1"><span class="f">F</span><span class="one">1</span></span> Dashboard</h1>
     </div>
 
     <!-- Tabs -->
     <nav class="tabs" id="tabs">
-      <a href="#pump" class="active">Pump</a>
-      <a href="#DATs">DATs</a>
-      <a href="#HYPE">HYPE</a>
+      <a href="#pump" class="active">PUMP</a>
+      <a href="#dats">DATs</a>
+      <a href="#hype">HYPE</a>
       <a href="#risk">Risk</a>
     </nav>
 
-    <!-- Pump tab (your charts) -->
-    <section id="pane-pump" class="tabpane active" role="tabpanel" aria-labelledby="tab-pump">
+    <!-- Pump tab -->
+    <section id="pane-pump" class="tabpane active">
       <h2>PUMP — Price vs Fees</h2>
       <div class="toolbar" data-for="chart">
         <button class="on" data-range="ALL">All</button>
@@ -104,51 +119,62 @@
       <canvas id="chart-buybacks"></canvas>
     </section>
 
-    <!-- Placeholder tabs you can fill later -->
-    <section id="pane-DATs" class="tabpane" role="tabpanel" aria-labelledby="tab-DATs">
+    <!-- DATs -->
+    <section id="pane-dats" class="tabpane">
       <h2>DATs (placeholder)</h2>
       <p>DAT info will go here.</p>
     </section>
 
-    <section id="pane-HYPE" class="tabpane" role="tabpanel" aria-labelledby="tab-HYPE">
+    <!-- HYPE -->
+    <section id="pane-hype" class="tabpane">
       <h2>HYPE (placeholder)</h2>
       <p>All things HYPE will go here.</p>
     </section>
 
-    <section id="pane-risk" class="tabpane" role="tabpanel" aria-labelledby="tab-risk">
+    <!-- Risk -->
+    <section id="pane-risk" class="tabpane">
       <h2>Risk (placeholder)</h2>
       <p>XYZ.</p>
     </section>
   </div>
 
-  <!-- Tiny tab router -->
+  <!-- Tab router -->
   <script>
-    (function(){
+    (function () {
       const links = Array.from(document.querySelectorAll('#tabs a'));
       const panes = {
-        pump:      document.getElementById('pane-pump'),
-        overview:  document.getElementById('pane-overview'),
-        onchain:   document.getElementById('pane-onchain'),
-        risk:      document.getElementById('pane-risk'),
+        pump: document.getElementById('pane-pump'),
+        dats: document.getElementById('pane-dats'),
+        hype: document.getElementById('pane-hype'),
+        risk: document.getElementById('pane-risk'),
       };
-      function activate(name){
-        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + name));
-        Object.entries(panes).forEach(([k,el]) => el.classList.toggle('active', k === name));
-        if (name === 'pump' && window.__charts) Object.values(window.__charts).forEach(ch => ch?.resize?.());
+      function activate(name) {
+        const target = name.toLowerCase();
+        links.forEach(a => {
+          const href = a.getAttribute('href').slice(1).toLowerCase();
+          a.classList.toggle('active', href === target);
+        });
+        Object.entries(panes).forEach(([k, el]) => el.classList.toggle('active', k === target));
+        if (target === 'pump' && window.__charts) {
+          Object.values(window.__charts).forEach(ch => ch?.resize?.());
+        }
       }
-      function fromHash(){
-        const h = (location.hash || '#pump').slice(1);
+      function fromHash() {
+        const h = (location.hash || '#pump').slice(1).toLowerCase();
         activate(panes[h] ? h : 'pump');
       }
       window.addEventListener('hashchange', fromHash);
-      links.forEach(a => a.addEventListener('click', (e)=>{ e.preventDefault(); location.hash = a.getAttribute('href'); }));
+      links.forEach(a => a.addEventListener('click', (e) => {
+        e.preventDefault();
+        location.hash = a.getAttribute('href');
+      }));
       fromHash();
     })();
   </script>
 
-  <!-- Your chart logic with range buttons -->
   <script src="script.js"></script>
 </body>
 </html>
+
 
 
