@@ -184,3 +184,76 @@ with open(out_file, "w") as f:
 print(f"wrote {out_file} rows:", len(df_pbb))
 
 
+# ---------- 4) PUMP: Cumulative Buybacks vs Circulating Market Cap ----------
+# Reuse the daily price and buybacks we already fetched/built above (df_pbb has date, price, buybacks_native, buybacks_usd)
+
+# 4.1 Fetch circulating market cap (or compute as circulating_supply * price if needed)
+def try_fetch_metric_single(metric_candidates):
+    for name in metric_candidates:
+        try:
+            r = API.fetch_metrics(metric_names=f"price,{name}", symbols=ASSET,
+                                  start_date=START, end_date=END)
+            d = (r.model_dump() if hasattr(r, "model_dump") else r.__dict__)["data"]["symbols"][ASSET]
+            if name in d:
+                return d, name
+        except Exception:
+            pass
+    return None, None
+
+mcap_candidates = [
+    "circulating_market_cap",
+    "market_cap_circulating",
+    "marketcap_circulating",
+    "mcap_circulating",
+    "market_cap"  # fallback if it's actually circulating
+]
+
+sym_mc, used_mcap_key = try_fetch_metric_single(mcap_candidates)
+
+if sym_mc is not None:
+    df_mc = to_df_vals(sym_mc[used_mcap_key], "mcap_usd")
+else:
+    # Fallback: compute market cap = circulating_supply * price if supply is available
+    try:
+        r = API.fetch_metrics(metric_names="price,circulating_supply", symbols=ASSET,
+                              start_date=START, end_date=END)
+        d = (r.model_dump() if hasattr(r, "model_dump") else r.__dict__)["data"]["symbols"][ASSET]
+        df_price2 = to_df_vals(d.get("price", []), "price")
+        df_supply = to_df_vals(d.get("circulating_supply", []), "circ_supply")
+        df_mc = pd.merge(df_price2, df_supply, on="date", how="outer").sort_values("date")
+        df_mc["mcap_usd"] = df_mc["price"] * df_mc["circ_supply"]
+        df_mc = df_mc[["date", "mcap_usd"]]
+        used_mcap_key = "computed(price * circulating_supply)"
+    except Exception as e:
+        raise RuntimeError("Could not obtain circulating market cap (or supply).") from e
+
+# 4.2 Build cumulative buybacks USD
+df_pbb2 = df_pbb.copy()
+df_pbb2 = df_pbb2.sort_values("date")
+df_pbb2["cum_buybacks_usd"] = df_pbb2["buybacks_usd"].fillna(0).cumsum()
+
+# 4.3 Merge with market cap and compute % of supply bought
+df_bm = pd.merge(df_pbb2[["date", "cum_buybacks_usd"]], df_mc, on="date", how="outer").sort_values("date")
+# forward-fill market cap gaps if any (optional)
+df_bm["mcap_usd"] = df_bm["mcap_usd"].ffill()
+# percent retired so far
+df_bm["pct_bought"] = (df_bm["cum_buybacks_usd"] / df_bm["mcap_usd"]).where(df_bm["mcap_usd"] > 0)
+
+# 4.4 Write JSON
+out_file = "data/pump_buybacks_vs_mcap.json"
+os.makedirs("data", exist_ok=True)
+with open(out_file, "w") as f:
+    json.dump({
+        "series": [
+            {
+                "date": d.strftime("%Y-%m-%d"),
+                "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
+                "mcap_usd": None if pd.isna(mc) else float(mc),
+                "pct_bought": None if pd.isna(p) else float(p)
+            }
+            for d, cb, mc, p in zip(df_bm["date"], df_bm["cum_buybacks_usd"], df_bm["mcap_usd"], df_bm["pct_bought"])
+        ]
+    }, f, indent=2)
+print(f"wrote {out_file} using market cap key: {used_mcap_key} rows:", len(df_bm))
+
+
