@@ -95,13 +95,14 @@ makeDualAxis({
 });
 
 makeDualAxis({
-  el: "chart-buybacks",
-  file: "data/pump_price_buybacks_usd.json",
+  el: "chart-buybacks",                       // <-- matches canvas id
+  file: "data/pump_price_buybacks_usd.json",  // <-- matches Python output file
   leftKey: "price",
   rightKey: "buybacks_usd",
   leftLabel: "Price (USD)",
   rightLabel: "Buybacks (USD)",
-  leftColor: "#3b82f6",   // blue (or your preferred)
-  rightColor: "#ef4444"   // red (or your preferred)
+  leftColor: "#54d794",
+  rightColor: "#1a4846"
 });
+
 
