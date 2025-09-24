@@ -1,4 +1,4 @@
-// --- helpers ---------------------------------------------------------------
+// ---------- helpers ----------
 function rgba(hex, a = 0.15) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return hex;
@@ -6,51 +6,67 @@ function rgba(hex, a = 0.15) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-// cache json so repeated range switches don’t re-fetch files
-const __dataCache = Object.create(null);
-async function loadSeries(file) {
-  if (!__dataCache[file]) {
-    const res = await fetch(file, { cache: "no-store" });
-    const j = await res.json();
-    __dataCache[file] = j.series || [];
-  }
-  return __dataCache[file];
+function fmtPct(x) {
+  if (x === null || !isFinite(x)) return "—";
+  const v = (x * 100);
+  return (Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(2)) + "%";
 }
 
-/**
- * Build a dual-axis line chart and wire up the toolbar buttons under it.
- *
- * @param {object} cfg
- *   el:           canvas id
- *   file:         json path
- *   leftKey:      series key for left axis
- *   rightKey:     series key for right axis
- *   leftLabel:    legend label
- *   rightLabel:   legend label
- *   leftColor:    hex color (line)
- *   rightColor:   hex color (line)
- */
-async function makeDualAxis(cfg) {
-  const {
-    el, file,
-    leftKey, rightKey,
-    leftLabel, rightLabel,
-    leftColor = "#54d794",
-    rightColor = "#000000",
-  } = cfg;
+function fmtNum(x) {
+  if (x === null || !isFinite(x)) return "—";
+  return Number(x).toLocaleString();
+}
 
-  // 1) load data
-  const series = await loadSeries(file);
+// Find the latest non-null value in a series for a given key
+function latestValue(series, key) {
+  for (let i = series.length - 1; i >= 0; i--) {
+    const v = series[i][key];
+    if (v !== null && v !== undefined && !Number.isNaN(v)) return { i, v, d: series[i].date };
+  }
+  return { i: -1, v: null, d: null };
+}
 
-  // 2) shape data
+// Get a value ~N days back (closest on/after target date); falls back to earliest available
+function valueNDaysAgo(series, key, days) {
+  const last = latestValue(series, key);
+  if (last.i < 0) return { v: null, d: null };
+  const target = new Date(last.d);
+  target.setDate(target.getDate() - days);
+
+  // walk forward until we hit target or pass it
+  let candidate = null;
+  for (let i = 0; i <= last.i; i++) {
+    const d = new Date(series[i].date);
+    const v = series[i][key];
+    if (v === null || v === undefined || Number.isNaN(v)) continue;
+    if (d >= target) { candidate = { v, d: series[i].date }; break; }
+    candidate = { v, d: series[i].date }; // keep last good (fallback)
+  }
+  return candidate || { v: null, d: null };
+}
+
+// Return percent change between latest and N days ago
+function pctChange(series, key, days) {
+  const last = latestValue(series, key);
+  const base = valueNDaysAgo(series, key, days);
+  if (last.v === null || base.v === null || base.v === 0) return null;
+  return (last.v - base.v) / base.v;
+}
+
+// ---------- chart builder ----------
+async function makeDualAxis({
+  el, file, leftKey, rightKey, leftLabel, rightLabel,
+  leftColor = "#54d794", rightColor = "#000000"
+}) {
+  const res = await fetch(file, { cache: "no-store" });
+  const { series } = await res.json();
+
+  // Prepare data arrays
   const labels = series.map(d => d.date);
   const left   = series.map(d => d[leftKey]);
   const right  = series.map(d => d[rightKey]);
 
-  // 3) chart
-  const ctx = document.getElementById(el)?.getContext("2d");
-  if (!ctx) return;
-
+  const ctx = document.getElementById(el).getContext("2d");
   const chart = new Chart(ctx, {
     type: "line",
     data: {
@@ -65,7 +81,7 @@ async function makeDualAxis(cfg) {
           borderColor: leftColor,
           backgroundColor: rgba(leftColor, 0.12),
           borderWidth: 2,
-          fill: false,
+          fill: false
         },
         {
           label: rightLabel,
@@ -76,7 +92,7 @@ async function makeDualAxis(cfg) {
           borderColor: rightColor,
           backgroundColor: rgba(rightColor, 0.12),
           borderWidth: 2,
-          fill: false,
+          fill: false
         }
       ]
     },
@@ -84,10 +100,10 @@ async function makeDualAxis(cfg) {
       responsive: true,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { position: "top", labels: { color: "#111" } },
+        legend: { position: "top" },
         tooltip: {
           callbacks: {
-            label: c => {
+            label: (c) => {
               const label = c.dataset.label || "";
               const v = c.parsed.y;
               if (/price/i.test(label))
@@ -98,102 +114,143 @@ async function makeDualAxis(cfg) {
         }
       },
       scales: {
-        x: {
-          type: "time",
-          time: { unit: "day" },
-          ticks: { color: "#111" },
-          grid:  { color: "rgba(0,0,0,.06)" },
-        },
-        yL: {
-          position: "left",
-          ticks: { color: "#111", callback: v => `$${Number(v).toFixed(3)}` },
-          grid:  { color: "rgba(0,0,0,.06)" },
-        },
+        x: { type: "time", time: { unit: "day" } },
+        yL: { position: "left",  ticks: { callback: v => `$${Number(v).toFixed(3)}` } },
         yR: {
           position: "right",
-          grid: { drawOnChartArea: false, color: "#111" }, // right axis line black
-          ticks: { color: "#111", callback: v => Number(v).toLocaleString() },
+          grid: { drawOnChartArea: false },
+          ticks: { callback: v => Number(v).toLocaleString() }
         }
       }
     }
   });
 
-  // expose for resize from tab switch
-  window.__charts = window.__charts || {};
-  window.__charts[el] = chart;
-
-  // 4) wire toolbar (by data-for, so placement/position doesn’t matter)
-  const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
-  if (!toolbar) return;
-
-  function setActive(btn) {
-    toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
-  }
-
-  function cutoffFor(rangeCode) {
-    // labels are ISO dates (YYYY-MM-DD). Let’s compute a Date cutoff.
-    if (!labels.length || rangeCode === "ALL") return undefined;
-    const last = new Date(labels[labels.length - 1] + "T00:00:00Z");
-    const d = new Date(last);
-    if (rangeCode === "1W") d.setDate(d.getDate() - 7);
-    else if (rangeCode === "1M") d.setMonth(d.getMonth() - 1);
-    else if (rangeCode === "3M") d.setMonth(d.getMonth() - 3);
-    return d;
-  }
-
-  toolbar.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-range]");
-    if (!btn) return;
-    const range = btn.getAttribute("data-range");
-    const min = cutoffFor(range);
-    chart.options.scales.x.min = min;
-    chart.update();
-    setActive(btn);
-  });
-
-  // ensure default button (with .on) applies on load
-  const defaultBtn = toolbar.querySelector("button.on") || toolbar.querySelector("button[data-range]");
-  if (defaultBtn) {
-    const evt = new Event("click", { bubbles: true });
-    defaultBtn.dispatchEvent(evt);
-  }
+  return { chart, series };
 }
 
-// --- init all three charts ---------------------------------------------------
-document.addEventListener("DOMContentLoaded", () => {
-  makeDualAxis({
+// ---------- stats renderer ----------
+function renderStats(containerId, spec, series) {
+  // spec: [{label, key, isMoney}]
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const rows = spec.map(s => {
+    const ch1M = pctChange(series, s.key, 30);
+    const ch1W = pctChange(series, s.key, 7);
+    const cls1M = (ch1M ?? 0) > 0 ? "pos" : (ch1M ?? 0) < 0 ? "neg" : "";
+    const cls1W = (ch1W ?? 0) > 0 ? "pos" : (ch1W ?? 0) < 0 ? "neg" : "";
+
+    return `
+      <div class="stat-row">
+        <div class="stat-name">${s.label}</div>
+        <div class="stat-val ${cls1M}">${fmtPct(ch1M)}</div>
+        <div class="stat-val ${cls1W}">${fmtPct(ch1W)}</div>
+      </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="stat-head">
+      <div></div>
+      <div>1M</div>
+      <div>1W</div>
+    </div>
+    ${rows}
+  `;
+}
+
+// ---------- range buttons (per-chart) ----------
+function wireRangeButtons() {
+  const groups = document.querySelectorAll('.toolbar');
+  groups.forEach(g => {
+    const forId = g.getAttribute('data-for');
+    const buttons = g.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.toggle('on', b === btn));
+        const range = btn.getAttribute('data-range'); // ALL | 3M | 1M | 1W
+        const meta = window.__charts?.[forId];
+        if (!meta) return;
+
+        // Filter labels by range
+        const { chart, series } = meta;
+        let days = null;
+        if (range === '3M') days = 90;
+        if (range === '1M') days = 30;
+        if (range === '1W') days = 7;
+
+        let startIndex = 0;
+        if (days) {
+          const lastDate = new Date(series[series.length - 1].date);
+          const cutoff = new Date(lastDate);
+          cutoff.setDate(cutoff.getDate() - days);
+          startIndex = series.findIndex(d => new Date(d.date) >= cutoff);
+          if (startIndex < 0) startIndex = 0;
+        }
+
+        const slice = series.slice(startIndex);
+        chart.data.labels = slice.map(d => d.date);
+        chart.data.datasets[0].data = slice.map(d => d[chart.data.datasets[0].label.toLowerCase().includes('price') ? 'price' : '']);
+        // For safety, re-map from original keys instead of label check:
+        const ds0Key = meta.keys.left;
+        const ds1Key = meta.keys.right;
+        chart.data.datasets[0].data = slice.map(d => d[ds0Key]);
+        chart.data.datasets[1].data = slice.map(d => d[ds1Key]);
+
+        chart.update('none');
+      });
+    });
+  });
+}
+
+// ---------- boot ----------
+(async function init() {
+  window.__charts = {};
+
+  // 1) Price vs Fees
+  const pf = await makeDualAxis({
     el: "chart",
     file: "data/pump.json",
-    leftKey: "price",
-    rightKey: "fees",
-    leftLabel: "Price (USD)",
-    rightLabel: "Fees",
-    leftColor: "#54d794",
-    rightColor: "#000000",
+    leftKey: "price",   rightKey: "fees",
+    leftLabel: "Price (USD)", rightLabel: "Fees",
+    leftColor: "#54d794", rightColor: "#000000"
   });
+  window.__charts["chart"] = { chart: pf.chart, series: pf.series, keys: { left: "price", right: "fees" } };
+  renderStats("stats-fees", [
+    { label: "Price Δ",   key: "price" },
+    { label: "Fees Δ",    key: "fees" },
+  ], pf.series);
 
-  makeDualAxis({
+  // 2) Price vs Revenue
+  const pr = await makeDualAxis({
     el: "chart-revenue",
     file: "data/pump_price_revenue.json",
-    leftKey: "price",
-    rightKey: "revenue",
-    leftLabel: "Price (USD)",
-    rightLabel: "Revenue",
-    leftColor: "#54d794",
-    rightColor: "#000000",
+    leftKey: "price", rightKey: "revenue",
+    leftLabel: "Price (USD)", rightLabel: "Revenue",
+    leftColor: "#54d794", rightColor: "#000000"
   });
+  window.__charts["chart-revenue"] = { chart: pr.chart, series: pr.series, keys: { left: "price", right: "revenue" } };
+  renderStats("stats-revenue", [
+    { label: "Price Δ",   key: "price" },
+    { label: "Revenue Δ", key: "revenue" },
+  ], pr.series);
 
-  makeDualAxis({
+  // 3) Price vs Buybacks
+  const pb = await makeDualAxis({
     el: "chart-buybacks",
     file: "data/pump_price_buybacks_usd.json",
-    leftKey: "price",
-    rightKey: "buybacks_usd",
-    leftLabel: "Price (USD)",
-    rightLabel: "Buybacks (USD)",
-    leftColor: "#54d794",
-    rightColor: "#000000",
+    leftKey: "price", rightKey: "buybacks_usd",
+    leftLabel: "Price (USD)", rightLabel: "Buybacks (USD)",
+    leftColor: "#54d794", rightColor: "#000000"
   });
-});
+  window.__charts["chart-buybacks"] = { chart: pb.chart, series: pb.series, keys: { left: "price", right: "buybacks_usd" } };
+  renderStats("stats-buybacks", [
+    { label: "Price Δ",      key: "price" },
+    { label: "Buybacks Δ",   key: "buybacks_usd" },
+  ], pb.series);
+
+  wireRangeButtons();
+})();
+
 
 
 
