@@ -2,133 +2,141 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PUMP — Dashboards</title>
+  <title>Polychain F1 — Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Libre+Baskerville&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <style>
-    :root {
-      --ink: #111;
-      --rule: #e6e6e6;
-      --heading-font: "Playfair Display", Georgia, "Times New Roman", serif;
-      --body-font: "Libre Baskerville", Georgia, "Times New Roman", serif;
+    :root{
+      --ink:#111; --rule:#e6e6e6;
+      --heading-font:"Playfair Display", Georgia, "Times New Roman", serif;
+      --body-font:"Libre Baskerville", Georgia, "Times New Roman", serif;
+      --tab:#111; --tabOff:#888; --tabBg:#fff;
     }
+    html,body{margin:0;padding:0;background:#fff;color:var(--ink);
+      font-family:var(--body-font);font-size:16px;line-height:1.5}
+    .page{max-width:1100px;margin:28px auto;padding:28px;border:4px solid #000;box-sizing:border-box}
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      color: var(--ink);
-      font-family: var(--body-font);
-      font-size: 16px;
-      line-height: 1.5;
-    }
+    /* Landing header */
+    .hero{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px;border-bottom:1px solid var(--rule);padding-bottom:18px}
+    .hero img{width:120px;height:120px;object-fit:contain}
+    .hero h1{font-family:var(--heading-font);font-size:44px;line-height:1.1;margin:0;text-align:center}
 
-    .page {
-      max-width: 1100px;
-      margin: 28px auto;
-      padding: 28px;
-      border: 4px solid #000;
-      box-sizing: border-box;
+    /* Tabs */
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px;border-bottom:1px solid var(--rule);padding-bottom:10px}
+    .tabs a{
+      text-decoration:none; color:var(--tabOff); background:var(--tabBg);
+      border:1px solid var(--tabOff); padding:6px 12px; border-radius:18px;
+      font:600 13px/1 var(--body-font);
     }
+    .tabs a.active{color:#fff;background:var(--tab);border-color:var(--tab)}
 
-    header {
-      position: relative;
-      margin-bottom: 20px;
-      border-bottom: 1px solid var(--rule);
-      padding-bottom: 10px;
-    }
-
-    .brand {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 56px;
-      width: auto;
-    }
-
-    h1 {
-      font-family: var(--heading-font);
-      font-size: 48px;
-      margin: 0;
-      text-align: center;
-      padding: 0;
-    }
-
-    h2 {
-      font-family: var(--heading-font);
-      font-size: 18px;
-      text-align: center;
-      margin: 22px 0 10px;
-    }
+    /* Section headings + canvases */
+    h2{font-family:var(--heading-font);font-size:18px;text-align:center;margin:22px 0 10px}
+    canvas{max-width:100%;height:420px;margin:0 auto 30px;display:block;background:#fff}
 
     /* Range toolbar */
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: flex-end;
-      margin: 8px 0 16px;
-    }
-    .toolbar button {
-      appearance: none;
-      border: 1px solid #111;
-      background: #fff;
-      color: #111;
-      padding: 6px 10px;
-      border-radius: 18px;
-      font: 600 13px/1 var(--body-font);
-      cursor: pointer;
-    }
-    .toolbar button.on { background: #111; color: #fff; }
+    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:8px 0 16px}
+    .toolbar button{appearance:none;border:1px solid #111;background:#fff;color:#111;padding:6px 10px;border-radius:18px;font:600 13px/1 var(--body-font);cursor:pointer}
+    .toolbar button.on{background:#111;color:#fff}
 
-    canvas {
-      max-width: 100%;
-      height: 420px;
-      margin: 0 auto 30px;
-      display: block;
-      background: #fff;
-    }
+    /* Tab panes */
+    .tabpane{display:none}
+    .tabpane.active{display:block}
   </style>
 </head>
 <body>
   <div class="page">
-    <header>
-      <!-- If your file is actually named "polychain logo.gif" (with a space),
-           change the src below to assets/polychain%20logo.gif -->
-      <img src="assets/polychain-logo.gif" alt="Logo" class="brand">
-      <h1>PUMP — Dashboards</h1>
-    </header>
-
-    <h2>PUMP — Price vs Fees</h2>
-    <div class="toolbar" data-for="chart">
-      <button class="on" data-range="ALL">All</button>
-      <button data-range="3M">3M</button>
-      <button data-range="1M">1M</button>
-      <button data-range="1W">1W</button>
+    <!-- Big logo + title -->
+    <div class="hero">
+      <!-- If your file is named “polychain logo.gif” (with a space), keep the %20 below -->
+      <img src="assets/polychain%20logo.gif" alt="Polychain logo">
+      <h1>Polychain F1 Dashboard</h1>
     </div>
-    <canvas id="chart"></canvas>
 
-    <h2>PUMP — Price vs Revenue</h2>
-    <div class="toolbar" data-for="chart-revenue">
-      <button class="on" data-range="ALL">All</button>
-      <button data-range="3M">3M</button>
-      <button data-range="1M">1M</button>
-      <button data-range="1W">1W</button>
-    </div>
-    <canvas id="chart-revenue"></canvas>
+    <!-- Tabs -->
+    <nav class="tabs" id="tabs">
+      <a href="#pump" class="active">Pump</a>
+      <a href="#overview">Overview</a>
+      <a href="#onchain">On-chain</a>
+      <a href="#risk">Risk</a>
+    </nav>
 
-    <h2>PUMP — Price vs Buybacks (USD)</h2>
-    <div class="toolbar" data-for="chart-buybacks">
-      <button class="on" data-range="ALL">All</button>
-      <button data-range="3M">3M</button>
-      <button data-range="1M">1M</button>
-      <button data-range="1W">1W</button>
-    </div>
-    <canvas id="chart-buybacks"></canvas>
+    <!-- Pump tab (your charts) -->
+    <section id="pane-pump" class="tabpane active" role="tabpanel" aria-labelledby="tab-pump">
+      <h2>PUMP — Price vs Fees</h2>
+      <div class="toolbar" data-for="chart">
+        <button class="on" data-range="ALL">All</button>
+        <button data-range="3M">3M</button>
+        <button data-range="1M">1M</button>
+        <button data-range="1W">1W</button>
+      </div>
+      <canvas id="chart"></canvas>
+
+      <h2>PUMP — Price vs Revenue</h2>
+      <div class="toolbar" data-for="chart-revenue">
+        <button class="on" data-range="ALL">All</button>
+        <button data-range="3M">3M</button>
+        <button data-range="1M">1M</button>
+        <button data-range="1W">1W</button>
+      </div>
+      <canvas id="chart-revenue"></canvas>
+
+      <h2>PUMP — Price vs Buybacks (USD)</h2>
+      <div class="toolbar" data-for="chart-buybacks">
+        <button class="on" data-range="ALL">All</button>
+        <button data-range="3M">3M</button>
+        <button data-range="1M">1M</button>
+        <button data-range="1W">1W</button>
+      </div>
+      <canvas id="chart-buybacks"></canvas>
+    </section>
+
+    <!-- Placeholder tabs you can fill later -->
+    <section id="pane-overview" class="tabpane" role="tabpanel" aria-labelledby="tab-overview">
+      <h2>Overview (placeholder)</h2>
+      <p>Top KPIs for Polychain F1 will go here.</p>
+    </section>
+
+    <section id="pane-onchain" class="tabpane" role="tabpanel" aria-labelledby="tab-onchain">
+      <h2>On-chain (placeholder)</h2>
+      <p>Wallet flows, contract stats, DEX metrics, etc.</p>
+    </section>
+
+    <section id="pane-risk" class="tabpane" role="tabpanel" aria-labelledby="tab-risk">
+      <h2>Risk (placeholder)</h2>
+      <p>DD/volatility, VaR/tail metrics, alerts…</p>
+    </section>
   </div>
 
+  <!-- Tiny tab router -->
+  <script>
+    (function(){
+      const links = Array.from(document.querySelectorAll('#tabs a'));
+      const panes = {
+        pump:      document.getElementById('pane-pump'),
+        overview:  document.getElementById('pane-overview'),
+        onchain:   document.getElementById('pane-onchain'),
+        risk:      document.getElementById('pane-risk'),
+      };
+      function activate(name){
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + name));
+        Object.entries(panes).forEach(([k,el]) => el.classList.toggle('active', k === name));
+        if (name === 'pump' && window.__charts) Object.values(window.__charts).forEach(ch => ch?.resize?.());
+      }
+      function fromHash(){
+        const h = (location.hash || '#pump').slice(1);
+        activate(panes[h] ? h : 'pump');
+      }
+      window.addEventListener('hashchange', fromHash);
+      links.forEach(a => a.addEventListener('click', (e)=>{ e.preventDefault(); location.hash = a.getAttribute('href'); }));
+      fromHash();
+    })();
+  </script>
+
+  <!-- Your chart logic with range buttons -->
   <script src="script.js"></script>
 </body>
 </html>
+
 
