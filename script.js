@@ -38,7 +38,6 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const el = document.getElementById(targetId);
   if (!el) return;
 
-  // Work over the full series regardless of current chart range
   const rows = series.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
   if (!rows.length) { el.innerHTML = ""; return; }
 
@@ -59,7 +58,6 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const R_w  = pctChange(R_now, R_7);
   const R_m  = pctChange(R_now, R_30);
 
-  // label mapping
   const map = { price: "Price", fees: "Fees", revenue: "Revenue", buybacks_usd: "Buybacks" };
 
   el.innerHTML = `
@@ -91,7 +89,7 @@ function filterByRange(series, token) {
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
   leftColor = PRICE_COLOR, rightColor = RIGHT_COLOR,
-  statsId // <— id of the side-box to fill
+  statsId
 }) {
   const res = await fetch(file, { cache: "no-store" });
   const { series } = await res.json();
@@ -110,24 +108,26 @@ async function makeDualAxis({
       labels,
       datasets: [
         {
-          label: leftLabel,
-          data: dataL,
-          yAxisID: "yL",
-          tension: .25,
-          pointRadius: 0,
-          borderColor: leftColor,
-          backgroundColor: rgba(leftColor, 0.12),
-          borderWidth: 2,
-          fill: false
-        },
-        {
-          label: rightLabel,
+          // LEFT axis (non-price) — stays BLACK
+          label: rightLabel,        // <— we’ll draw non-price second below; flip labels to keep legend order if you like
           data: dataR,
-          yAxisID: "yR",
+          yAxisID: "yL",
           tension: .25,
           pointRadius: 0,
           borderColor: rightColor,
           backgroundColor: rgba(rightColor, 0.12),
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          // RIGHT axis (price) — stays GREEN
+          label: leftLabel,
+          data: dataL,
+          yAxisID: "yR",
+          tension: .25,
+          pointRadius: 0,
+          borderColor: leftColor,
+          backgroundColor: rgba(leftColor, 0.12),
           borderWidth: 2,
           fill: false
         }
@@ -152,11 +152,16 @@ async function makeDualAxis({
       },
       scales: {
         x: { type: "time", time: { unit: "day" } },
-        yL: { position: "left",  ticks: { callback: v => `$${Number(v).toFixed(3)}` } },
+        // LEFT axis for non-price values (fees/revenue/buybacks)
+        yL: {
+          position: "left",
+          ticks: { callback: v => Number(v).toLocaleString() }
+        },
+        // RIGHT axis for Price (USD)
         yR: {
           position: "right",
           grid: { drawOnChartArea: false },
-          ticks: { callback: v => Number(v).toLocaleString() }
+          ticks: { callback: v => `$${Number(v).toFixed(3)}` }
         }
       }
     }
@@ -174,8 +179,8 @@ async function makeDualAxis({
       const subset = filterByRange(series, token);
 
       chart.data.labels = subset.map(d => d.date);
-      chart.data.datasets[0].data = subset.map(d => d[leftKey]);
-      chart.data.datasets[1].data = subset.map(d => d[rightKey]);
+      chart.data.datasets[0].data = subset.map(d => d[rightKey]); // non-price on LEFT
+      chart.data.datasets[1].data = subset.map(d => d[leftKey]);  // price on RIGHT
       chart.update();
     });
   }
