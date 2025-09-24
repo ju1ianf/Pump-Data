@@ -204,6 +204,21 @@
         <!-- ID must be exactly 'stats-chart-bb' for script.js -->
         <aside class="statbox" id="stats-chart-bb"></aside>
       </div>
+
+      <!-- NEW: Cumulative Buybacks vs Circulating Market Cap -->
+      <div class="chart-row">
+        <div>
+          <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
+          <div class="toolbar" data-for="chart-bbmcap">
+            <button class="on" data-range="ALL">All</button>
+            <button data-range="3M">3M</button>
+            <button data-range="1M">1M</button>
+            <button data-range="1W">1W</button>
+          </div>
+          <canvas id="chart-bbmcap"></canvas>
+        </div>
+        <aside class="statbox" id="stats-chart-bbmcap"></aside>
+      </div>
     </section>
 
     <!-- DATs -->
