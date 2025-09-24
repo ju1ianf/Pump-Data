@@ -1,4 +1,4 @@
-// ---------- helpers ----------
+/* ---------- helpers ---------- */
 function rgba(hex, a = 0.15) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return hex;
@@ -6,65 +6,102 @@ function rgba(hex, a = 0.15) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-function fmtPct(x) {
-  if (x === null || !isFinite(x)) return "—";
-  const v = (x * 100);
-  return (Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(2)) + "%";
-}
+const PRICE_COLOR = "#54d794";
+const RIGHT_COLOR = "#000000";
 
-function fmtNum(x) {
-  if (x === null || !isFinite(x)) return "—";
-  return Number(x).toLocaleString();
-}
-
-// Find the latest non-null value in a series for a given key
-function latestValue(series, key) {
-  for (let i = series.length - 1; i >= 0; i--) {
-    const v = series[i][key];
-    if (v !== null && v !== undefined && !Number.isNaN(v)) return { i, v, d: series[i].date };
+/* find the most recent value at or before a given Date */
+function latestOnOrBefore(rows, key, cutoff) {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const d = new Date(rows[i].date);
+    if (d <= cutoff) {
+      const v = rows[i][key];
+      if (typeof v === "number" && !Number.isNaN(v)) return v;
+    }
   }
-  return { i: -1, v: null, d: null };
+  return NaN;
 }
 
-// Get a value ~N days back (closest on/after target date); falls back to earliest available
-function valueNDaysAgo(series, key, days) {
-  const last = latestValue(series, key);
-  if (last.i < 0) return { v: null, d: null };
-  const target = new Date(last.d);
-  target.setDate(target.getDate() - days);
-
-  // walk forward until we hit target or pass it
-  let candidate = null;
-  for (let i = 0; i <= last.i; i++) {
-    const d = new Date(series[i].date);
-    const v = series[i][key];
-    if (v === null || v === undefined || Number.isNaN(v)) continue;
-    if (d >= target) { candidate = { v, d: series[i].date }; break; }
-    candidate = { v, d: series[i].date }; // keep last good (fallback)
-  }
-  return candidate || { v: null, d: null };
+/* % change utility */
+function pctChange(now, then) {
+  if (!isFinite(now) || !isFinite(then) || then === 0) return null;
+  return ((now - then) / Math.abs(then)) * 100;
 }
 
-// Return percent change between latest and N days ago
-function pctChange(series, key, days) {
-  const last = latestValue(series, key);
-  const base = valueNDaysAgo(series, key, days);
-  if (last.v === null || base.v === null || base.v === 0) return null;
-  return (last.v - base.v) / base.v;
+function formatPct(x) {
+  if (x === null) return "—";
+  const s = x >= 0 ? "+" : "";
+  return `${s}${x.toFixed(1)}%`;
 }
 
-// ---------- chart builder ----------
+/* render the right-hand stats box */
+function renderStatsBox(targetId, series, leftKey, rightKey) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+
+  // Work over the full series regardless of current chart range
+  const rows = series.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (!rows.length) { el.innerHTML = ""; return; }
+
+  const lastDate = new Date(rows[rows.length - 1].date);
+  const d7  = new Date(lastDate); d7.setDate(d7.getDate() - 7);
+  const d30 = new Date(lastDate); d30.setDate(d30.getDate() - 30);
+
+  const L_now  = latestOnOrBefore(rows, leftKey,  lastDate);
+  const L_7    = latestOnOrBefore(rows, leftKey,  d7);
+  const L_30   = latestOnOrBefore(rows, leftKey,  d30);
+
+  const R_now  = latestOnOrBefore(rows, rightKey, lastDate);
+  const R_7    = latestOnOrBefore(rows, rightKey, d7);
+  const R_30   = latestOnOrBefore(rows, rightKey, d30);
+
+  const L_w  = pctChange(L_now, L_7);
+  const L_m  = pctChange(L_now, L_30);
+  const R_w  = pctChange(R_now, R_7);
+  const R_m  = pctChange(R_now, R_30);
+
+  // label mapping
+  const map = { price: "Price", fees: "Fees", revenue: "Revenue", buybacks_usd: "Buybacks" };
+
+  el.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-title">${map[leftKey] || leftKey}</div>
+      <div class="stat-row"><span>1M</span><strong class="${L_m>=0?"pos":"neg"}">${formatPct(L_m)}</strong></div>
+      <div class="stat-row"><span>1W</span><strong class="${L_w>=0?"pos":"neg"}">${formatPct(L_w)}</strong></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">${map[rightKey] || rightKey}</div>
+      <div class="stat-row"><span>1M</span><strong class="${R_m>=0?"pos":"neg"}">${formatPct(R_m)}</strong></div>
+      <div class="stat-row"><span>1W</span><strong class="${R_w>=0?"pos":"neg"}">${formatPct(R_w)}</strong></div>
+    </div>
+  `;
+}
+
+/* subset by range tokens */
+function filterByRange(series, token) {
+  if (token === "ALL") return series;
+  const now = new Date(series[series.length - 1].date);
+  const back = new Date(now);
+  if (token === "3M") back.setMonth(back.getMonth() - 3);
+  else if (token === "1M") back.setMonth(back.getMonth() - 1);
+  else if (token === "1W") back.setDate(back.getDate() - 7);
+  return series.filter(r => new Date(r.date) >= back);
+}
+
+/* make a dual-axis line chart + hook up toolbar buttons */
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
-  leftColor = "#54d794", rightColor = "#000000"
+  leftColor = PRICE_COLOR, rightColor = RIGHT_COLOR,
+  statsId // <— id of the side-box to fill
 }) {
   const res = await fetch(file, { cache: "no-store" });
   const { series } = await res.json();
 
-  // Prepare data arrays
+  // one-time stats render (full history)
+  renderStatsBox(statsId, series, leftKey, rightKey);
+
   const labels = series.map(d => d.date);
-  const left   = series.map(d => d[leftKey]);
-  const right  = series.map(d => d[rightKey]);
+  const dataL  = series.map(d => d[leftKey]);
+  const dataR  = series.map(d => d[rightKey]);
 
   const ctx = document.getElementById(el).getContext("2d");
   const chart = new Chart(ctx, {
@@ -74,7 +111,7 @@ async function makeDualAxis({
       datasets: [
         {
           label: leftLabel,
-          data: left,
+          data: dataL,
           yAxisID: "yL",
           tension: .25,
           pointRadius: 0,
@@ -85,7 +122,7 @@ async function makeDualAxis({
         },
         {
           label: rightLabel,
-          data: right,
+          data: dataR,
           yAxisID: "yR",
           tension: .25,
           pointRadius: 0,
@@ -103,11 +140,11 @@ async function makeDualAxis({
         legend: { position: "top" },
         tooltip: {
           callbacks: {
-            label: (c) => {
+            label: c => {
               const label = c.dataset.label || "";
               const v = c.parsed.y;
               if (/price/i.test(label))
-                return `${label}: $${v?.toLocaleString(undefined,{ maximumFractionDigits:6 })}`;
+                return `${label}: $${v?.toLocaleString(undefined, { maximumFractionDigits: 6 })}`;
               return `${label}: ${v?.toLocaleString()}`;
             }
           }
@@ -125,132 +162,58 @@ async function makeDualAxis({
     }
   });
 
+  // attach range buttons
+  const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
+  if (toolbar) {
+    toolbar.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-range]");
+      if (!btn) return;
+      toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+
+      const token = btn.dataset.range;
+      const subset = filterByRange(series, token);
+
+      chart.data.labels = subset.map(d => d.date);
+      chart.data.datasets[0].data = subset.map(d => d[leftKey]);
+      chart.data.datasets[1].data = subset.map(d => d[rightKey]);
+      chart.update();
+    });
+  }
+
   return { chart, series };
 }
 
-// ---------- stats renderer ----------
-function renderStats(containerId, spec, series) {
-  // spec: [{label, key, isMoney}]
-  const el = document.getElementById(containerId);
-  if (!el) return;
+/* ---------- build charts ---------- */
+window.__charts = {};
 
-  const rows = spec.map(s => {
-    const ch1M = pctChange(series, s.key, 30);
-    const ch1W = pctChange(series, s.key, 7);
-    const cls1M = (ch1M ?? 0) > 0 ? "pos" : (ch1M ?? 0) < 0 ? "neg" : "";
-    const cls1W = (ch1W ?? 0) > 0 ? "pos" : (ch1W ?? 0) < 0 ? "neg" : "";
-
-    return `
-      <div class="stat-row">
-        <div class="stat-name">${s.label}</div>
-        <div class="stat-val ${cls1M}">${fmtPct(ch1M)}</div>
-        <div class="stat-val ${cls1W}">${fmtPct(ch1W)}</div>
-      </div>`;
-  }).join("");
-
-  el.innerHTML = `
-    <div class="stat-head">
-      <div></div>
-      <div>1M</div>
-      <div>1W</div>
-    </div>
-    ${rows}
-  `;
-}
-
-// ---------- range buttons (per-chart) ----------
-function wireRangeButtons() {
-  const groups = document.querySelectorAll('.toolbar');
-  groups.forEach(g => {
-    const forId = g.getAttribute('data-for');
-    const buttons = g.querySelectorAll('button');
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        buttons.forEach(b => b.classList.toggle('on', b === btn));
-        const range = btn.getAttribute('data-range'); // ALL | 3M | 1M | 1W
-        const meta = window.__charts?.[forId];
-        if (!meta) return;
-
-        // Filter labels by range
-        const { chart, series } = meta;
-        let days = null;
-        if (range === '3M') days = 90;
-        if (range === '1M') days = 30;
-        if (range === '1W') days = 7;
-
-        let startIndex = 0;
-        if (days) {
-          const lastDate = new Date(series[series.length - 1].date);
-          const cutoff = new Date(lastDate);
-          cutoff.setDate(cutoff.getDate() - days);
-          startIndex = series.findIndex(d => new Date(d.date) >= cutoff);
-          if (startIndex < 0) startIndex = 0;
-        }
-
-        const slice = series.slice(startIndex);
-        chart.data.labels = slice.map(d => d.date);
-        chart.data.datasets[0].data = slice.map(d => d[chart.data.datasets[0].label.toLowerCase().includes('price') ? 'price' : '']);
-        // For safety, re-map from original keys instead of label check:
-        const ds0Key = meta.keys.left;
-        const ds1Key = meta.keys.right;
-        chart.data.datasets[0].data = slice.map(d => d[ds0Key]);
-        chart.data.datasets[1].data = slice.map(d => d[ds1Key]);
-
-        chart.update('none');
-      });
-    });
-  });
-}
-
-// ---------- boot ----------
-(async function init() {
-  window.__charts = {};
-
+(async () => {
   // 1) Price vs Fees
-  const pf = await makeDualAxis({
+  window.__charts.pf = await makeDualAxis({
     el: "chart",
     file: "data/pump.json",
-    leftKey: "price",   rightKey: "fees",
+    leftKey: "price", rightKey: "fees",
     leftLabel: "Price (USD)", rightLabel: "Fees",
-    leftColor: "#54d794", rightColor: "#000000"
+    statsId: "stats-chart"
   });
-  window.__charts["chart"] = { chart: pf.chart, series: pf.series, keys: { left: "price", right: "fees" } };
-  renderStats("stats-fees", [
-    { label: "Price Δ",   key: "price" },
-    { label: "Fees Δ",    key: "fees" },
-  ], pf.series);
 
   // 2) Price vs Revenue
-  const pr = await makeDualAxis({
+  window.__charts.pr = await makeDualAxis({
     el: "chart-revenue",
     file: "data/pump_price_revenue.json",
     leftKey: "price", rightKey: "revenue",
     leftLabel: "Price (USD)", rightLabel: "Revenue",
-    leftColor: "#54d794", rightColor: "#000000"
+    statsId: "stats-chart-rev"
   });
-  window.__charts["chart-revenue"] = { chart: pr.chart, series: pr.series, keys: { left: "price", right: "revenue" } };
-  renderStats("stats-revenue", [
-    { label: "Price Δ",   key: "price" },
-    { label: "Revenue Δ", key: "revenue" },
-  ], pr.series);
 
-  // 3) Price vs Buybacks
-  const pb = await makeDualAxis({
+  // 3) Price vs Buybacks (USD)
+  window.__charts.pb = await makeDualAxis({
     el: "chart-buybacks",
     file: "data/pump_price_buybacks_usd.json",
     leftKey: "price", rightKey: "buybacks_usd",
     leftLabel: "Price (USD)", rightLabel: "Buybacks (USD)",
-    leftColor: "#54d794", rightColor: "#000000"
+    statsId: "stats-chart-bb"
   });
-  window.__charts["chart-buybacks"] = { chart: pb.chart, series: pb.series, keys: { left: "price", right: "buybacks_usd" } };
-  renderStats("stats-buybacks", [
-    { label: "Price Δ",      key: "price" },
-    { label: "Buybacks Δ",   key: "buybacks_usd" },
-  ], pb.series);
-
-  wireRangeButtons();
 })();
-
 
 
 
