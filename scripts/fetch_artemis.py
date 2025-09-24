@@ -10,24 +10,56 @@ END = date.today()
 START = END - timedelta(days=70)
 START, END = START.isoformat(), END.isoformat()
 
-def to_df(rows, name):
+def to_df_vals(rows, colname):
+    """
+    Convert Artemis rows -> tidy df(date, <colname>), coercing bad values to NaN.
+    Handles either {t, v} or {timestamp, val} shapes.
+    """
+    import pandas as pd
+
     if not rows:
-        return pd.DataFrame(columns=["date", name])
-    df = pd.DataFrame(rows).rename(columns={"val": name})
-    # support 'date' or 'timestamp'
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"])
+        return pd.DataFrame(columns=["date", colname])
+
+    df = pd.DataFrame(rows)
+
+    # Normalize value column: prefer 'v', else 'val'
+    if "v" in df.columns:
+        df = df.rename(columns={"v": colname})
+    elif "val" in df.columns:
+        df = df.rename(columns={"val": colname})
     else:
-        df["date"] = pd.to_datetime(df["timestamp"])
-    return df[["date", name]]
+        df[colname] = pd.NA  # create empty column if missing
+
+    # Normalize date column: prefer 't' (ms), else 'timestamp'
+    if "t" in df.columns:
+        df["date"] = (
+            pd.to_datetime(df["t"], unit="ms")
+              .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize()
+        )
+    elif "timestamp" in df.columns:
+        df["date"] = (
+            pd.to_datetime(df["timestamp"])
+              .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize()
+        )
+    elif "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+    # Coerce metric values (e.g. "METRIC NOT FOUND" → NaN)
+    if colname in df.columns:
+        df[colname] = pd.to_numeric(df[colname], errors="coerce")
+    else:
+        df[colname] = pd.NA
+
+    return df[["date", colname]]
+
 
 # ---------- 1) PUMP: Price + Fees -> data/pump.json ----------
 resp = API.fetch_metrics(metric_names="price,fees",
                          symbols=ASSET, start_date=START, end_date=END)
 sym = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
-df_price = to_df(sym["price"], "price")
-df_fees  = to_df(sym["fees"],  "fees")
+df_price = to_df_vals(sym["price"], "price")
+df_fees  = to_df_vals(sym["fees"],  "fees")
 df_pf = pd.merge(df_price, df_fees, on="date", how="outer").sort_values("date")
 
 os.makedirs("data", exist_ok=True)
@@ -71,8 +103,8 @@ for mset in candidates:
 if sym_rev is None:
     raise RuntimeError("No revenue-like metric found (tried revenue/protocol_revenue/revenue_usd/fees).")
 
-df_price_r = to_df(sym_rev["price"], "price")
-df_rev     = to_df(sym_rev[used_key], "revenue")  # normalize column name
+df_price_r = to_df_vals(sym_rev["price"], "price")
+df_rev     = to_df_vals(sym_rev[used_key], "revenue")  # normalize column name
 df_pr = pd.merge(df_price_r, df_rev, on="date", how="outer").sort_values("date")
 
 with open("data/pump_price_revenue.json", "w") as f:
