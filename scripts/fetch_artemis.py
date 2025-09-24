@@ -116,7 +116,7 @@ with open("data/pump_price_revenue.json", "w") as f:
     ]}, f, indent=2)
 print("wrote data/pump_price_revenue.json using metric:", used_key, "rows:", len(df_pr))
 
-# ---------- 3) PUMP: Price + Buybacks (Native) -> Buybacks (USD) ----------
+# -------- 3) PUMP: Price + Buybacks (Native) -> Buybacks (USD) --------
 # Fetch both series together so they're aligned on dates
 resp = API.fetch_metrics(
     metric_names="price,buybacks_native",
@@ -124,48 +124,77 @@ resp = API.fetch_metrics(
     start_date=START,
     end_date=END
 )
-
 sym_bb = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
 def to_df_vals(rows, colname):
-    """Convert Artemis rows -> tidy df(date, value), coercing bad values to NaN."""
+    """
+    Convert Artemis rows -> tidy df(date, value), coercing bad values to NaN.
+    Handles:
+      - value column: 'val' (or falls back to 'v' if ever used)
+      - time column: 't' (ms) or 'timestamp'
+      - strings like 'METRIC NOT FOUND' -> NaN
+    """
+    import pandas as pd
+
     if not rows:
         return pd.DataFrame(columns=["date", colname])
-    df = pd.DataFrame(rows).rename(columns={"v": colname})
-    # Artemis rows typically have 't' (ms) or 'date'. Reuse your existing time parsing helper:
+
+    df = pd.DataFrame(rows)
+
+    # Normalize value column
+    if "val" in df.columns:
+        df = df.rename(columns={"val": colname})
+    elif "v" in df.columns:
+        df = df.rename(columns={"v": colname})
+    else:
+        # If there's no recognizable value column, return empty
+        return pd.DataFrame(columns=["date", colname])
+
+    # Normalize time column
     if "t" in df.columns:
-        df["date"] = pd.to_datetime(df["t"], unit="ms").dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize()
+        df["date"] = (pd.to_datetime(df["t"], unit="ms")
+                        .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize())
     elif "timestamp" in df.columns:
-        df["date"] = pd.to_datetime(df["timestamp"]).dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize()
-    # Coerce metric values: "METRIC NOT FOUND" -> NaN, strings -> NaN, etc.
+        df["date"] = (pd.to_datetime(df["timestamp"])
+                        .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize())
+    else:
+        # No time column -> empty
+        return pd.DataFrame(columns=["date", colname])
+
+    # Coerce numeric values; non-numeric (e.g., 'METRIC NOT FOUND') -> NaN
     df[colname] = pd.to_numeric(df[colname], errors="coerce")
+
     return df[["date", colname]]
 
-df_price = to_df_vals(sym_bb.get("price", []), "price")
-df_bb    = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native")
+# Build tidy frames
+df_price       = to_df_vals(sym_bb.get("price", []),            "price")
+df_bb_native   = to_df_vals(sym_bb.get("buybacks_native", []),  "buybacks_native")
 
-# Full outer merge on date, sort
-df_pbb = pd.merge(df_price, df_bb, on="date", how="outer").sort_values("date").reset_index(drop=True)
+# Outer join on date so we never drop a day; sort by time
+df_pbb = (pd.merge(df_price, df_bb_native, on="date", how="outer")
+            .sort_values("date")
+            .reset_index(drop=True))
 
-# Forward-fill buybacks_native ONLY (per your rule to use previous day's buybacks when missing)
+# Your rule: when buybacks_native is missing, use previous day's value
 df_pbb["buybacks_native"] = df_pbb["buybacks_native"].ffill()
 
-# Compute buybacks in USD = buybacks_native * price
+# Convert to USD: native * price
 df_pbb["buybacks_usd"] = df_pbb["buybacks_native"] * df_pbb["price"]
 
 # Write JSON for the frontend
+os.makedirs("data", exist_ok=True)
 out_file = "data/pump_price_buybacks_usd.json"
 with open(out_file, "w") as f:
     json.dump({
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
-                "price": None if pd.isna(p) else float(p),
+                "price":        None if pd.isna(p)  else float(p),
                 "buybacks_usd": None if pd.isna(bu) else float(bu),
             }
             for d, p, bu in zip(df_pbb["date"], df_pbb["price"], df_pbb["buybacks_usd"])
         ]
     }, f, indent=2)
-
 print(f"wrote {out_file} rows:", len(df_pbb))
+
 
