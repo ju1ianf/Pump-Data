@@ -1,4 +1,5 @@
-/* ---------- helpers ---------- */
+/* ======================= helpers & constants ======================= */
+
 function rgba(hex, a = 0.15) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return hex;
@@ -6,10 +7,10 @@ function rgba(hex, a = 0.15) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-const PRICE_COLOR = "#54d794";
-const RIGHT_COLOR = "#000000";
+const PRICE_COLOR = "#54d794";  // green
+const OTHER_COLOR = "#000000";  // black
 
-/* find the most recent value at or before a given Date */
+/* find the most recent numeric value at or before a given Date */
 function latestOnOrBefore(rows, key, cutoff) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const d = new Date(rows[i].date);
@@ -26,14 +27,24 @@ function pctChange(now, then) {
   if (!isFinite(now) || !isFinite(then) || then === 0) return null;
   return ((now - then) / Math.abs(then)) * 100;
 }
-
 function formatPct(x) {
   if (x === null) return "—";
   const s = x >= 0 ? "+" : "";
   return `${s}${x.toFixed(1)}%`;
 }
 
-/* render the right-hand stats box */
+/* subset by range tokens */
+function filterByRange(series, token) {
+  if (token === "ALL") return series;
+  const now = new Date(series[series.length - 1].date);
+  const back = new Date(now);
+  if (token === "3M") back.setMonth(back.getMonth() - 3);
+  else if (token === "1M") back.setMonth(back.getMonth() - 1);
+  else if (token === "1W") back.setDate(back.getDate() - 7);
+  return series.filter(r => new Date(r.date) >= back);
+}
+
+/* render the right-hand stats box for dual-axis charts */
 function renderStatsBox(targetId, series, leftKey, rightKey) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -74,21 +85,11 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   `;
 }
 
-/* subset by range tokens */
-function filterByRange(series, token) {
-  if (token === "ALL") return series;
-  const now = new Date(series[series.length - 1].date);
-  const back = new Date(now);
-  if (token === "3M") back.setMonth(back.getMonth() - 3);
-  else if (token === "1M") back.setMonth(back.getMonth() - 1);
-  else if (token === "1W") back.setDate(back.getDate() - 7);
-  return series.filter(r => new Date(r.date) >= back);
-}
+/* =================== dual-axis (Price on RIGHT) =================== */
 
-/* make a dual-axis line chart + hook up toolbar buttons */
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
-  leftColor = PRICE_COLOR, rightColor = RIGHT_COLOR,
+  leftColor = OTHER_COLOR, rightColor = PRICE_COLOR,
   statsId
 }) {
   const res = await fetch(file, { cache: "no-store" });
@@ -108,26 +109,26 @@ async function makeDualAxis({
       labels,
       datasets: [
         {
-          // LEFT axis = non-price (black)
-          label: rightLabel,
-          data: dataR,
-          yAxisID: "yL",
-          tension: .25,
-          pointRadius: 0,
-          borderColor: rightColor,
-          backgroundColor: rgba(rightColor, 0.12),
-          borderWidth: 2,
-          fill: false
-        },
-        {
-          // RIGHT axis = price (green)
+          // LEFT axis (USD): non-price metric, black
           label: leftLabel,
           data: dataL,
-          yAxisID: "yR",
+          yAxisID: "yL",
           tension: .25,
           pointRadius: 0,
           borderColor: leftColor,
           backgroundColor: rgba(leftColor, 0.12),
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          // RIGHT axis (USD): Price, green
+          label: rightLabel,
+          data: dataR,
+          yAxisID: "yR",
+          tension: .25,
+          pointRadius: 0,
+          borderColor: rightColor,
+          backgroundColor: rgba(rightColor, 0.12),
           borderWidth: 2,
           fill: false
         }
@@ -143,25 +144,21 @@ async function makeDualAxis({
             label: c => {
               const label = c.dataset.label || "";
               const v = c.parsed.y;
-              if (/price/i.test(label))
-                return `${label}: $${v?.toLocaleString(undefined, { maximumFractionDigits: 6 })}`;
-              return `${label}: $${v?.toLocaleString()}`; // add $ to non-price values too
+              return `${label}: $${Number(v).toLocaleString(undefined,{ maximumFractionDigits: 6 })}`;
             }
           }
         }
       },
       scales: {
         x: { type: "time", time: { unit: "day" } },
-        // LEFT axis = non-price (dollar sign added)
         yL: {
           position: "left",
           ticks: { callback: v => `$${Number(v).toLocaleString()}` }
         },
-        // RIGHT axis = price
         yR: {
           position: "right",
           grid: { drawOnChartArea: false },
-          ticks: { callback: v => `$${Number(v).toFixed(3)}` }
+          ticks: { callback: v => `$${Number(v).toLocaleString()}` }
         }
       }
     }
@@ -179,8 +176,8 @@ async function makeDualAxis({
       const subset = filterByRange(series, token);
 
       chart.data.labels = subset.map(d => d.date);
-      chart.data.datasets[0].data = subset.map(d => d[rightKey]); // non-price left
-      chart.data.datasets[1].data = subset.map(d => d[leftKey]);  // price right
+      chart.data.datasets[0].data = subset.map(d => d[leftKey]);
+      chart.data.datasets[1].data = subset.map(d => d[rightKey]);
       chart.update();
     });
   }
@@ -188,35 +185,219 @@ async function makeDualAxis({
   return { chart, series };
 }
 
-/* ---------- build charts ---------- */
+/* ========== PUMP: Cumulative Buybacks vs Market Cap (USD + %) ========== */
+
+// % axis tick format
+function fmtPctAxis(v) {
+  if (!isFinite(v)) return "";
+  return `${(v * 100).toFixed(1)}%`;
+}
+
+async function makeBuybacksVsMcap({ el, file, statsId }) {
+  const res = await fetch(file, { cache: "no-store" });
+  const { series } = await res.json();
+
+  // ---- stats box: share retired + changes for buybacks & mcap ----
+  (function renderStats() {
+    const target = document.getElementById(statsId);
+    if (!target || !series?.length) return;
+
+    const rows = series.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+    const last = new Date(rows[rows.length-1].date);
+    const d7 = new Date(last);  d7.setDate(d7.getDate()-7);
+    const d30 = new Date(last); d30.setDate(d30.getDate()-30);
+
+    const latest = latestOnOrBefore(rows, "pct_bought", last);
+    const wk  = latestOnOrBefore(rows, "pct_bought", d7);
+    const mo  = latestOnOrBefore(rows, "pct_bought", d30);
+    const pct_now = isFinite(latest) ? `${(latest*100).toFixed(2)}%` : "—";
+    const pct_w = pctChange(latest, wk);
+    const pct_m = pctChange(latest, mo);
+
+    const b_now = latestOnOrBefore(rows, "cum_buybacks_usd", last);
+    const b_w   = latestOnOrBefore(rows, "cum_buybacks_usd", d7);
+    const b_m   = latestOnOrBefore(rows, "cum_buybacks_usd", d30);
+
+    const m_now = latestOnOrBefore(rows, "mcap_usd", last);
+    const m_w   = latestOnOrBefore(rows, "mcap_usd", d7);
+    const m_m   = latestOnOrBefore(rows, "mcap_usd", d30);
+
+    target.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-title">Share retired</div>
+        <div class="stat-row"><span>Now</span><strong>${pct_now}</strong></div>
+        <div class="stat-row"><span>1M Δ</span><strong class="${pct_m>=0?'pos':'neg'}">${formatPct(pct_m)}</strong></div>
+        <div class="stat-row"><span>1W Δ</span><strong class="${pct_w>=0?'pos':'neg'}">${formatPct(pct_w)}</strong></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Cum. Buybacks (USD)</div>
+        <div class="stat-row"><span>Now</span><strong>$${Number(b_now||0).toLocaleString()}</strong></div>
+        <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(b_now,b_m)>=0?'pos':'neg'}">${formatPct(pctChange(b_now,b_m))}</strong></div>
+        <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(b_now,b_w)>=0?'pos':'neg'}">${formatPct(pctChange(b_now,b_w))}</strong></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Mkt Cap (USD)</div>
+        <div class="stat-row"><span>Now</span><strong>$${Number(m_now||0).toLocaleString()}</strong></div>
+        <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(m_now,m_m)>=0?'pos':'neg'}">${formatPct(pctChange(m_now,m_m))}</strong></div>
+        <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(m_now,m_w)>=0?'pos':'neg'}">${formatPct(pctChange(m_now,m_w))}</strong></div>
+      </div>
+    `;
+  })();
+
+  const labels = series.map(d => d.date);
+  const buyUSD = series.map(d => d.cum_buybacks_usd);
+  const mcapUSD= series.map(d => d.mcap_usd);
+  const pct    = series.map(d => d.pct_bought);
+
+  const ctx = document.getElementById(el).getContext("2d");
+
+  const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { // USD axis (left): Market Cap (black)
+          label: "Market Cap (USD)",
+          data: mcapUSD,
+          yAxisID: "yUSD",
+          tension: .25,
+          pointRadius: 0,
+          borderColor: "#000000",
+          backgroundColor: rgba("#000000", 0.12),
+          borderWidth: 2,
+          fill: false
+        },
+        { // USD axis (left): Cum. Buybacks (green)
+          label: "Cum. Buybacks (USD)",
+          data: buyUSD,
+          yAxisID: "yUSD",
+          tension: .25,
+          pointRadius: 0,
+          borderColor: "#54d794",
+          backgroundColor: rgba("#54d794", 0.12),
+          borderWidth: 2,
+          fill: false
+        },
+        { // % axis (right): share retired
+          label: "Share retired (%)",
+          data: pct,
+          yAxisID: "yPct",
+          tension: .25,
+          pointRadius: 0,
+          borderColor: "#777",
+          borderDash: [6,4],
+          backgroundColor: "transparent",
+          borderWidth: 2,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "top" },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const label = c.dataset.label || "";
+              const v = c.parsed.y;
+              if (c.dataset.yAxisID === "yPct") {
+                return `${label}: ${(v*100).toFixed(2)}%`;
+              }
+              return `${label}: $${Number(v).toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { type: "time", time: { unit: "day" } },
+        yUSD: {
+          position: "left",
+          ticks: { callback: v => `$${Number(v).toLocaleString()}` }
+        },
+        yPct: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: {
+            callback: v => fmtPctAxis(v)
+          }
+        }
+      }
+    }
+  });
+
+  // range buttons
+  const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
+  if (toolbar) {
+    toolbar.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-range]");
+      if (!btn) return;
+      toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+
+      const token = btn.dataset.range;
+      const subset = filterByRange(series, token);
+      chart.data.labels = subset.map(d => d.date);
+      chart.data.datasets[0].data = subset.map(d => d.mcap_usd);
+      chart.data.datasets[1].data = subset.map(d => d.cum_buybacks_usd);
+      chart.data.datasets[2].data = subset.map(d => d.pct_bought);
+      chart.update();
+    });
+  }
+
+  return { chart, series };
+}
+
+/* ======================= build all charts ======================= */
+
 window.__charts = {};
 
 (async () => {
+  // 1) Price vs Fees  (Price on RIGHT)
   window.__charts.pf = await makeDualAxis({
     el: "chart",
     file: "data/pump.json",
-    leftKey: "price", rightKey: "fees",
-    leftLabel: "Price (USD)", rightLabel: "Fees",
+    leftKey: "fees",
+    rightKey: "price",
+    leftLabel: "Fees (USD)",
+    rightLabel: "Price (USD)",
+    leftColor: OTHER_COLOR,
+    rightColor: PRICE_COLOR,
     statsId: "stats-chart"
   });
 
+  // 2) Price vs Revenue (Price on RIGHT)
   window.__charts.pr = await makeDualAxis({
     el: "chart-revenue",
     file: "data/pump_price_revenue.json",
-    leftKey: "price", rightKey: "revenue",
-    leftLabel: "Price (USD)", rightLabel: "Revenue",
+    leftKey: "revenue",
+    rightKey: "price",
+    leftLabel: "Revenue (USD)",
+    rightLabel: "Price (USD)",
+    leftColor: OTHER_COLOR,
+    rightColor: PRICE_COLOR,
     statsId: "stats-chart-rev"
   });
 
+  // 3) Price vs Buybacks (USD) (Price on RIGHT)
   window.__charts.pb = await makeDualAxis({
     el: "chart-buybacks",
     file: "data/pump_price_buybacks_usd.json",
-    leftKey: "price", rightKey: "buybacks_usd",
-    leftLabel: "Price (USD)", rightLabel: "Buybacks (USD)",
+    leftKey: "buybacks_usd",
+    rightKey: "price",
+    leftLabel: "Buybacks (USD)",
+    rightLabel: "Price (USD)",
+    leftColor: OTHER_COLOR,
+    rightColor: PRICE_COLOR,
     statsId: "stats-chart-bb"
   });
+
+  // 4) Cumulative Buybacks vs Circulating Market Cap
+  window.__charts.bbmcap = await makeBuybacksVsMcap({
+    el: "chart-bbmcap",
+    file: "data/pump_buybacks_vs_mcap.json",
+    statsId: "stats-chart-bbmcap"
+  });
 })();
-
-
 
 
