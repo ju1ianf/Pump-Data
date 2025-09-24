@@ -8,8 +8,8 @@ function rgba(hex, a = 0.15) {
 
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
-  leftColor = "#54d794",   // default pumpfun
-  rightColor = "#FFFFFF"   // default white
+  leftColor = "#54d794",   // default pumpfun green
+  rightColor = "#000000"   // default black
 }) {
   const res = await fetch(file, { cache: "no-store" });
   const { series } = await res.json();
@@ -28,8 +28,8 @@ async function makeDualAxis({
           label: leftLabel,
           data: left,
           yAxisID: "yL",
-          tension:.25,
-          pointRadius:0,
+          tension: .25,
+          pointRadius: 0,
           borderColor: leftColor,
           backgroundColor: rgba(leftColor, 0.12),
           borderWidth: 2,
@@ -39,8 +39,8 @@ async function makeDualAxis({
           label: rightLabel,
           data: right,
           yAxisID: "yR",
-          tension:.25,
-          pointRadius:0,
+          tension: .25,
+          pointRadius: 0,
           borderColor: rightColor,
           backgroundColor: rgba(rightColor, 0.12),
           borderWidth: 2,
@@ -51,25 +51,51 @@ async function makeDualAxis({
     options: {
       responsive: true,
       interaction: { mode: "index", intersect: false },
+
+      // legend + tooltip
       plugins: {
-        legend: { position: "top" },
+        legend: {
+          position: "top",
+          labels: { color: "#000000" }   // legend labels -> black
+        },
         tooltip: {
           callbacks: {
             label: c => {
               const label = c.dataset.label || "";
               const v = c.parsed.y;
-              if (/price/i.test(label))
-                return `${label}: $${v?.toLocaleString(undefined,{ maximumFractionDigits:6 })}`;
+              if (/price/i.test(label)) {
+                return `${label}: $${v?.toLocaleString(undefined,{ maximumFractionDigits: 6 })}`;
+              }
               return `${label}: ${v?.toLocaleString()}`;
             }
           }
         }
       },
+
+      // axes
       scales: {
-        x: { type: "time", time: { unit: "day" } },
-        yL: { position: "left",  ticks: { callback: v => `$${Number(v).toFixed(3)}` } },
-        yR: { position: "right", grid: { drawOnChartArea: false },
-              ticks: { callback: v => Number(v).toLocaleString() } }
+        x: {
+          type: "time",
+          time: { unit: "day" },
+          ticks: { color: "#000000" },       // x tick labels -> black
+          border: { color: "#000000" },      // x axis line -> black
+          grid: { color: "#e6e6e6" }         // subtle grid (optional)
+        },
+        yL: {
+          position: "left",
+          ticks: {
+            color: "#000000",                // left ticks -> black
+            callback: v => `$${Number(v).toFixed(3)}`
+          },
+          border: { color: "#000000" },      // left axis line -> black
+          grid: { color: "#e6e6e6" }         // optional
+        },
+        yR: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: { color: "#000000" },       // right ticks -> black
+          border: { color: "#000000" }       // **right axis line -> black**
+        }
       }
     }
   });
@@ -81,8 +107,8 @@ makeDualAxis({
   file: "data/pump.json",
   leftKey: "price", rightKey: "fees",
   leftLabel: "Price (USD)", rightLabel: "Fees",
-  leftColor: "#54d794",   // pumpfun green
-  rightColor: "#FFFFFF"   // White
+  leftColor: "#54d794",
+  rightColor: "#000000"
 });
 
 makeDualAxis({
@@ -90,19 +116,20 @@ makeDualAxis({
   file: "data/pump_price_revenue.json",
   leftKey: "price", rightKey: "revenue",
   leftLabel: "Price (USD)", rightLabel: "Revenue",
-  leftColor: "#54d794",   // pumpfun green
-  rightColor: "#FFFFFF"   // White
+  leftColor: "#54d794",
+  rightColor: "#000000"
 });
 
 makeDualAxis({
-  el: "chart-buybacks",                       // <-- matches canvas id
-  file: "data/pump_price_buybacks_usd.json",  // <-- matches Python output file
+  el: "chart-buybacks",
+  file: "data/pump_price_buybacks_usd.json",
   leftKey: "price",
   rightKey: "buybacks_usd",
   leftLabel: "Price (USD)",
   rightLabel: "Buybacks (USD)",
   leftColor: "#54d794",
-  rightColor: "#FFFFFF"
+  rightColor: "#000000"
 });
+
 
 
