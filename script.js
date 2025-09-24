@@ -1,22 +1,19 @@
-(async () => {
-  const res = await fetch("data/pump.json", { cache: "no-store" });
+async function makeDualAxis({ el, file, leftKey, rightKey, leftLabel, rightLabel }) {
+  const res = await fetch(file, { cache: "no-store" });
   const { series } = await res.json();
 
   const labels = series.map(d => d.date);
-  const price  = series.map(d => d.price);
-  const fees   = series.map(d => d.fees);
+  const left   = series.map(d => d[leftKey]);
+  const right  = series.map(d => d[rightKey]);
 
-  const fmtUSD  = v => v == null ? "–" : `$${v.toLocaleString(undefined,{ maximumFractionDigits:6 })}`;
-  const fmtBig  = v => v == null ? "–" : v.toLocaleString();
-
-  const ctx = document.getElementById("chart").getContext("2d");
+  const ctx = document.getElementById(el).getContext("2d");
   new Chart(ctx, {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: "Price (USD)", data: price, yAxisID: "yL", tension:.25, pointRadius:0 },
-        { label: "Fees",        data: fees,  yAxisID: "yR", tension:.25, pointRadius:0 }
+        { label: leftLabel,  data: left,  yAxisID: "yL", tension:.25, pointRadius:0 },
+        { label: rightLabel, data: right, yAxisID: "yR", tension:.25, pointRadius:0 }
       ]
     },
     options: {
@@ -26,9 +23,12 @@
         legend: { position: "top" },
         tooltip: {
           callbacks: {
-            label: c => c.dataset.label === "Price (USD)"
-              ? `${c.dataset.label}: ${fmtUSD(c.parsed.y)}`
-              : `${c.dataset.label}: ${fmtBig(c.parsed.y)}`
+            label: c => {
+              const label = c.dataset.label || "";
+              const v = c.parsed.y;
+              if (/price/i.test(label)) return `${label}: $${v?.toLocaleString(undefined,{ maximumFractionDigits:6 })}`;
+              return `${label}: ${v?.toLocaleString()}`;
+            }
           }
         }
       },
@@ -39,5 +39,21 @@
       }
     }
   });
-})();
+}
+
+// Existing chart: Price vs Fees (reads data/pump.json or your current file)
+makeDualAxis({
+  el: "chart",
+  file: "data/pump.json",
+  leftKey: "price", rightKey: "fees",
+  leftLabel: "Price (USD)", rightLabel: "Fees"
+});
+
+// New chart: Price vs Revenue (reads data/pump_price_revenue.json)
+makeDualAxis({
+  el: "chart-revenue",
+  file: "data/pump_price_revenue.json",
+  leftKey: "price", rightKey: "revenue",
+  leftLabel: "Price (USD)", rightLabel: "Revenue"
+});
 
