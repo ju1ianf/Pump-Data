@@ -117,60 +117,84 @@ with open("data/pump_price_revenue.json", "w") as f:
 print("wrote data/pump_price_revenue.json using metric:", used_key, "rows:", len(df_pr))
 
 # -------- 3) PUMP: Price + Buybacks (Native) -> Buybacks (USD) --------
-# Fetch both series together so they're aligned on dates
+# Fetch both series so they're aligned on dates
 resp = API.fetch_metrics(
     metric_names="price,buybacks_native",
     symbols=ASSET,
     start_date=START,
-    end_date=END
+    end_date=END,
 )
 sym_bb = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
 def to_df_vals(rows, colname):
     """
     Convert Artemis rows -> tidy df(date, value), coercing bad values to NaN.
-    Handles:
-      - value column: 'val' (or falls back to 'v' if ever used)
-      - time column: 't' (ms) or 'timestamp'
-      - strings like 'METRIC NOT FOUND' -> NaN
+
+    This is defensive on purpose: it handles a bunch of shapes:
+      - rows is a list[dict] (normal)
+      - rows is a dict containing 'rows'
+      - value column might be 'val', 'value', or already named as `colname`
+      - time column might be 't' (ms), 'timestamp', 'date', or 'time'
+      - non-numeric values ('METRIC NOT FOUND', etc.) -> NaN
     """
     import pandas as pd
 
     if not rows:
         return pd.DataFrame(columns=["date", colname])
 
+    # If API returns {"rows":[...]}
+    if isinstance(rows, dict) and "rows" in rows and isinstance(rows["rows"], list):
+        rows = rows["rows"]
+
+    if not isinstance(rows, list) or (len(rows) > 0 and not isinstance(rows[0], dict)):
+        # Unexpected shape; return empty so we don't crash
+        return pd.DataFrame(columns=["date", colname])
+
     df = pd.DataFrame(rows)
 
-    # Normalize value column
-    if "val" in df.columns:
+    # Normalize value column to `colname`
+    if colname in df.columns:
+        pass  # already correct
+    elif "val" in df.columns:
         df = df.rename(columns={"val": colname})
+    elif "value" in df.columns:
+        df = df.rename(columns={"value": colname})
     elif "v" in df.columns:
         df = df.rename(columns={"v": colname})
     else:
-        # If there's no recognizable value column, return empty
+        # No recognizable value column
         return pd.DataFrame(columns=["date", colname])
 
-    # Normalize time column
-    if "t" in df.columns:
-        df["date"] = (pd.to_datetime(df["t"], unit="ms")
+    # Normalize time column to `date` (naive, UTC normalized)
+    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    elif "t" in df.columns:
+        df["date"] = (pd.to_datetime(df["t"], unit="ms", errors="coerce")
                         .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize())
     elif "timestamp" in df.columns:
-        df["date"] = (pd.to_datetime(df["timestamp"])
+        df["date"] = (pd.to_datetime(df["timestamp"], errors="coerce")
                         .dt.tz_localize("UTC").dt.tz_convert(None).dt.normalize())
+    elif "time" in df.columns:
+        df["date"] = pd.to_datetime(df["time"], errors="coerce")
     else:
-        # No time column -> empty
+        # No recognizable time column
         return pd.DataFrame(columns=["date", colname])
 
-    # Coerce numeric values; non-numeric (e.g., 'METRIC NOT FOUND') -> NaN
+    # Coerce numeric value; bad strings -> NaN
     df[colname] = pd.to_numeric(df[colname], errors="coerce")
 
-    return df[["date", colname]]
+    # Drop rows where `date` couldn't be parsed
+    df = df.loc[~df["date"].isna(), ["date", colname]]
+    return df
 
 # Build tidy frames
-df_price       = to_df_vals(sym_bb.get("price", []),            "price")
-df_bb_native   = to_df_vals(sym_bb.get("buybacks_native", []),  "buybacks_native")
+df_price     = to_df_vals(sym_bb.get("price", []),            "price")
+df_bb_native = to_df_vals(sym_bb.get("buybacks_native", []),  "buybacks_native")
 
-# Outer join on date so we never drop a day; sort by time
+# DEBUG: print counts to the Actions log
+print("buybacks section: len(price)=", len(df_price), "len(buybacks_native)=", len(df_bb_native))
+
+# Outer join on date so we keep all days; sort by time
 df_pbb = (pd.merge(df_price, df_bb_native, on="date", how="outer")
             .sort_values("date")
             .reset_index(drop=True))
