@@ -1,0 +1,30 @@
+name: update-data
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 * * * *"   # hourly; adjust as needed
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install artemis pandas
+      - name: Fetch Artemis data
+        env:
+          ARTEMIS_API_KEY: ${{ secrets.ARTEMIS_API_KEY }}
+        run: python scripts/fetch_artemis.py
+      - name: Commit data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pump.json
+          git commit -m "refresh pump.json" || echo "no changes"
+          git push
