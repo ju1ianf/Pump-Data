@@ -94,4 +94,14 @@ makeDualAxis({
   rightColor: "#1a4846"   // dark green
 });
 
+makeDualAxis({
+  el: "chart-buybacks",
+  file: "data/pump_price_buybacks_usd.json",
+  leftKey: "price",
+  rightKey: "buybacks_usd",
+  leftLabel: "Price (USD)",
+  rightLabel: "Buybacks (USD)",
+  leftColor: "#3b82f6",   // blue (or your preferred)
+  rightColor: "#ef4444"   // red (or your preferred)
+});
 
