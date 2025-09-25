@@ -559,6 +559,7 @@ window.__charts = {};
     return pts;
   }
 
+  // === Relative Performance chart (with tooltip sorted by performance) ===
   async function updateRelPerfChart() {
     const canvas = document.getElementById("relperf-chart");
     if (!canvas || !state.assetsIndex) return;
@@ -596,16 +597,28 @@ window.__charts = {};
         minute: xUnit === "hour" ? "2-digit" : undefined
       });
 
+    // NEW: sort tooltip items by y DESC (leader first) and hide NaNs
+    const tooltipItemSort = (a, b) => {
+      const ya = Number.isFinite(a.parsed?.y) ? a.parsed.y : -Infinity;
+      const yb = Number.isFinite(b.parsed?.y) ? b.parsed.y : -Infinity;
+      return yb - ya;
+    };
+    const tooltipFilter = (item) => Number.isFinite(item.parsed?.y);
+
     if (!rel.chart) {
       rel.chart = new Chart(ctx, {
         type: "line",
         data: { datasets },
         options: {
-          maintainAspectRatio: false,   // <<< restored so canvas matches CSS height (sharp, correct size)
+          maintainAspectRatio: false,
           interaction: { mode: "index", axis: "x", intersect: false },
           plugins: {
             legend: { position: "top" },
             tooltip: {
+              mode: "index",
+              intersect: false,
+              itemSort: tooltipItemSort,
+              filter: tooltipFilter,
               callbacks: {
                 title: (items) => items?.length ? tooltipTitle(items[0].parsed.x) : "",
                 label: (c) => `${c.dataset.label}: ${(c.parsed.y >= 0 ? "+" : "")}${c.parsed.y.toFixed(2)}%`,
@@ -638,10 +651,17 @@ window.__charts = {};
     } else {
       rel.chart.data.datasets = datasets;
       rel.chart.options.scales.x.time.unit = xUnit;
+
+      // keep sorting behavior on updates as well
+      const tt = rel.chart.options.plugins.tooltip;
+      tt.itemSort = tooltipItemSort;
+      tt.filter = tooltipFilter;
+
       rel.chart.update();
     }
   }
 
+  // --------- Table rendering ---------
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -697,10 +717,13 @@ window.__charts = {};
     }
   }
 
+  // --------- init & wiring ---------
   async function init() {
+    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
+    // range buttons (ONLY inside the performance pane)
     document.addEventListener("click", (e) => {
       const btn = e.target.closest('#pane-performance .rng[data-range]');
       if (!btn) return;
@@ -711,12 +734,14 @@ window.__charts = {};
       updateRelPerfChart();
     });
 
+    // selector chips
     buildPicker();
 
     await renderTable();
     await updateRelPerfChart();
   }
 
+  // lazy init when the tab is opened; init immediately if already active
   document.addEventListener("DOMContentLoaded", () => {
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
@@ -736,3 +761,4 @@ window.__charts = {};
     }
   });
 })();
+
