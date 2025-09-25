@@ -75,7 +75,7 @@ function filterByRange(series, token) {
   return series.filter(r => new Date(r.date) >= back);
 }
 
-/* Single dual-axis chart where Price (green) is on the RIGHT axis */
+/* ========== Dual-axis (left dollars, right Price) ========== */
 async function makeDualAxis({
   el, file, leftKey, rightKey, leftLabel, rightLabel,
   leftColor = RIGHT_COLOR, rightColor = PRICE_COLOR,
@@ -180,6 +180,169 @@ async function makeDualAxis({
   }
 }
 
+/* ========== Cumulative Buybacks vs Circulating Market Cap ========== */
+function fmtPctAxis(v) {
+  if (!isFinite(v)) return "";
+  return `${(v * 100).toFixed(1)}%`;
+}
+
+async function makeBuybacksVsMcap({ el, file, statsId }) {
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`${file} fetch failed`);
+    const { series } = await res.json();
+    if (!Array.isArray(series)) throw new Error(`${file} bad shape`);
+
+    // Stats: share retired + components
+    (function renderStats() {
+      const target = document.getElementById(statsId);
+      if (!target || !series.length) return;
+
+      const rows = series.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+      const last = new Date(rows[rows.length-1].date);
+      const d7 = new Date(last);  d7.setDate(d7.getDate()-7);
+      const d30 = new Date(last); d30.setDate(d30.getDate()-30);
+
+      const pct_now = latestOnOrBefore(rows,"pct_bought", last);
+      const pct_w   = latestOnOrBefore(rows,"pct_bought", d7);
+      const pct_m   = latestOnOrBefore(rows,"pct_bought", d30);
+
+      const b_now = latestOnOrBefore(rows,"cum_buybacks_usd", last);
+      const b_w   = latestOnOrBefore(rows,"cum_buybacks_usd", d7);
+      const b_m   = latestOnOrBefore(rows,"cum_buybacks_usd", d30);
+
+      const m_now = latestOnOrBefore(rows,"mcap_usd", last);
+      const m_w   = latestOnOrBefore(rows,"mcap_usd", d7);
+      const m_m   = latestOnOrBefore(rows,"mcap_usd", d30);
+
+      target.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-title">Share retired</div>
+          <div class="stat-row"><span>Now</span><strong>${isFinite(pct_now)?(pct_now*100).toFixed(2)+'%':'—'}</strong></div>
+          <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(pct_now,pct_m)>=0?'pos':'neg'}">${formatPct(pctChange(pct_now,pct_m))}</strong></div>
+          <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(pct_now,pct_w)>=0?'pos':'neg'}">${formatPct(pctChange(pct_now,pct_w))}</strong></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Cum. Buybacks (USD)</div>
+          <div class="stat-row"><span>Now</span><strong>$${Number(b_now||0).toLocaleString()}</strong></div>
+          <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(b_now,b_m)>=0?'pos':'neg'}">${formatPct(pctChange(b_now,b_m))}</strong></div>
+          <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(b_now,b_w)>=0?'pos':'neg'}">${formatPct(pctChange(b_now,b_w))}</strong></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Mkt Cap (USD)</div>
+          <div class="stat-row"><span>Now</span><strong>$${Number(m_now||0).toLocaleString()}</strong></div>
+          <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(m_now,m_m)>=0?'pos':'neg'}">${formatPct(pctChange(m_now,m_m))}</strong></div>
+          <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(m_now,m_w)>=0?'pos':'neg'}">${formatPct(pctChange(m_now,m_w))}</strong></div>
+        </div>
+      `;
+    })();
+
+    const labels = series.map(d => d.date);
+    const buyUSD = series.map(d => d.cum_buybacks_usd);
+    const mcapUSD= series.map(d => d.mcap_usd);
+    const pct    = series.map(d => d.pct_bought);
+
+    const ctx = document.getElementById(el)?.getContext("2d");
+    if (!ctx) return null;
+
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { // USD axis (left): Market Cap (black)
+            label: "Market Cap (USD)",
+            data: mcapUSD,
+            yAxisID: "yUSD",
+            tension: .25,
+            pointRadius: 0,
+            borderColor: "#000000",
+            backgroundColor: rgba("#000000", 0.12),
+            borderWidth: 2,
+            fill: false
+          },
+          { // USD axis (left): Cum. Buybacks (green)
+            label: "Cum. Buybacks (USD)",
+            data: buyUSD,
+            yAxisID: "yUSD",
+            tension: .25,
+            pointRadius: 0,
+            borderColor: "#54d794",
+            backgroundColor: rgba("#54d794", 0.12),
+            borderWidth: 2,
+            fill: false
+          },
+          { // % axis (right): share retired
+            label: "Share retired (%)",
+            data: pct,
+            yAxisID: "yPct",
+            tension: .25,
+            pointRadius: 0,
+            borderColor: "#777",
+            borderDash: [6,4],
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "top" },
+          tooltip: {
+            callbacks: {
+              label: c => {
+                const label = c.dataset.label || "";
+                const v = c.parsed.y;
+                if (c.dataset.yAxisID === "yPct") {
+                  return `${label}: ${(v*100).toFixed(2)}%`;
+                }
+                return `${label}: $${Number(v).toLocaleString()}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { type: "time", time: { unit: "day" } },
+          yUSD: {
+            position: "left",
+            ticks: { callback: v => `$${Number(v).toLocaleString()}` }
+          },
+          yPct: {
+            position: "right",
+            grid: { drawOnChartArea: false },
+            ticks: { callback: fmtPctAxis }
+          }
+        }
+      }
+    });
+
+    // Range buttons
+    const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
+    if (toolbar) {
+      toolbar.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-range]");
+        if (!btn) return;
+        toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+
+        const subset = filterByRange(series, btn.dataset.range);
+        chart.data.labels = subset.map(d => d.date);
+        chart.data.datasets[0].data = subset.map(d => d.mcap_usd);
+        chart.data.datasets[1].data = subset.map(d => d.cum_buybacks_usd);
+        chart.data.datasets[2].data = subset.map(d => d.pct_bought);
+        chart.update();
+      });
+    }
+
+    return { chart, series };
+  } catch (err) {
+    console.error("BB vs Mcap init failed:", el, err);
+    return null;
+  }
+}
+
 /* ========= build charts ========= */
 window.__charts = {};
 
@@ -206,10 +369,10 @@ window.__charts = {};
     statsId: "stats-chart-rev"
   });
 
-  // 3) Price vs Buybacks  (now using plain "buybacks")
+  // 3) Price vs Buybacks  (using plain "buybacks")
   window.__charts.priceBuybacks = await makeDualAxis({
     el: "chart-buybacks",
-    file: "data/pump_buybacks.json",   // <-- expects { date, price, buybacks }
+    file: "data/pump_buybacks.json",   // expects { date, price, buybacks }
     leftKey: "buybacks",
     rightKey: "price",
     leftLabel: "Buybacks",
@@ -217,7 +380,13 @@ window.__charts = {};
     statsId: "stats-chart-bb"
   });
 
-  // (Your separate “Cumulative Buybacks vs Market Cap” chart stays in its own builder)
+  // 4) Cumulative Buybacks vs Circulating Market Cap
+  window.__charts.bbmcap = await makeBuybacksVsMcap({
+    el: "chart-bbmcap",
+    file: "data/pump_buybacks_vs_mcap.json", // expects { date, cum_buybacks_usd, mcap_usd, pct_bought }
+    statsId: "stats-chart-bbmcap"
+  });
 })();
+
 
 
