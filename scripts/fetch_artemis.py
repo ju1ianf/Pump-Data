@@ -176,7 +176,7 @@ if sym_rev is None:
 
 df_price_r = to_df_vals(sym_rev.get("price", []), "price")
 df_rev      = to_df_vals(sym_rev.get(used_key, []), "revenue")
-df_pr       = pd.merge(df_price_r, df_rev, on("date"), how="outer").sort_values("date")  # type: ignore
+df_pr       = pd.merge(df_price_r, df_rev, on="date", how="outer").sort_values("date")
 df_pr       = trim_from(df_pr)
 
 with open("data/pump_price_revenue.json", "w") as f:
@@ -343,3 +343,4 @@ for a in assets_idx.get("assets", []):
         print(f"[perf ok] {sym} -> {path} ({len(out)} points)")
     except Exception as e:
         print(f"[perf fail] {sym}: {e}")
+
