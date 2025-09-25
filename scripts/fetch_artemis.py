@@ -186,15 +186,12 @@ print(f"wrote {out_file} rows:", len(df_pbb))
 
 # ---------- 4) PUMP: Cumulative Buybacks (USD) vs Market Cap -> data/pump_buybacks_vs_mcap.json ----------
 
-# We need (a) cumulative buybacks in native units, (b) price, and (c) circulating mcap (either directly, or price*supply).
-# Try to fetch market cap directly first; otherwise fall back to circulating supply and compute price * supply.
-
 def fetch_block(metric_names):
     r = API.fetch_metrics(metric_names=metric_names, symbols=ASSET,
                           start_date=START, end_date=END)
     return r.model_dump() if hasattr(r, "model_dump") else r.__dict__
 
-# 4a) Grab price + buybacks_native (as earlier)
+# (a) Price + buybacks_native (unchanged)
 resp_bb = API.fetch_metrics(
     metric_names="price,buybacks_native",
     symbols=ASSET,
@@ -203,36 +200,41 @@ resp_bb = API.fetch_metrics(
 )
 sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
 df_price_bb = to_df_vals(sym_bb.get("price", []), "price")
-df_bb_native = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native")
-
-# If buybacks_native is missing some days, forward-fill so it's cumulative
-df_bb_native = df_bb_native.sort_values("date").reset_index(drop=True)
+df_bb_native = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native").sort_values("date").reset_index(drop=True)
 df_bb_native["buybacks_native"] = df_bb_native["buybacks_native"].ffill()
 
-# 4b) Try to get market cap directly; else circulating supply
+# (b) Candidate keys that count as market cap or supply
 mcap_candidates = [
-    "market_cap", "marketcap_usd", "marketcap", "circulating_market_cap_usd"
+    "market_cap", "marketcap_usd", "marketcap",
+    "circulating_market_cap", "circulating_market_cap_usd",
+    "circulating_marketcap", "circ_market_cap",
+    "cmc", "CMC",  # <-- added for your case
 ]
-supply_candidates = [
-    "circulating_supply", "supply_circulating", "supply"
-]
+supply_candidates = ["circulating_supply", "supply_circulating", "supply"]
 
+# Try to fetch any of those combos; we include cmc variants explicitly
 sym_mc, used_mcap_key = None, None
 try:
-    # Try a few batches that include price so dates align
-    for names in ["price,market_cap", "price,marketcap_usd", "price,marketcap",
-                  "price,circulating_market_cap_usd",
-                  "price,circulating_supply", "price,supply_circulating", "price,supply"]:
+    queries = [
+        # direct market-cap keys
+        "price,market_cap", "price,marketcap_usd", "price,marketcap",
+        "price,circulating_market_cap", "price,circulating_market_cap_usd",
+        "price,circulating_marketcap", "price,circ_market_cap",
+        "price,cmc", "price,CMC",                  # <-- added
+        # supply fallbacks
+        "price,circulating_supply", "price,supply_circulating", "price,supply",
+    ]
+    for names in queries:
         block = fetch_block(names)
         d = block["data"]["symbols"][ASSET]
-        # market cap?
+        # prefer market-cap keys
         for k in mcap_candidates:
             if k in d:
                 sym_mc, used_mcap_key = d, k
                 break
         if sym_mc:
             break
-        # or supply?
+        # otherwise supply keys
         for k in supply_candidates:
             if k in d:
                 sym_mc, used_mcap_key = d, k
@@ -242,19 +244,16 @@ try:
 except Exception:
     pass
 
-# Build aligned frame of price + buybacks_native
+# Build core frame
 df_core = (
     pd.merge(df_price_bb, df_bb_native, on="date", how="outer")
       .sort_values("date").reset_index(drop=True)
 )
 
-# Compute buybacks in USD.
-# NOTE: If buybacks_native is already cumulative, this yields cumulative USD.
-# If it's daily flow, we convert to USD then cumsum (defensive check below).
+# USD buybacks (cumulative)
 df_core["buybacks_usd_raw"] = df_core["buybacks_native"] * df_core["price"]
 
 def ensure_cumulative(series: pd.Series) -> pd.Series:
-    """If the series is not monotonically non-decreasing, cumsum it as a fallback."""
     s = series.copy()
     if s.dropna().is_monotonic_increasing:
         return s
@@ -262,27 +261,35 @@ def ensure_cumulative(series: pd.Series) -> pd.Series:
 
 df_core["cum_buybacks_usd"] = ensure_cumulative(df_core["buybacks_usd_raw"])
 
-# Get market cap (prefer direct). If we only have supply, compute price * supply.
+# Always create the column to avoid KeyError; fill if we found a metric
 df_core["mcap_usd"] = pd.NA
 
 if sym_mc is not None and used_mcap_key in mcap_candidates:
+    # market cap is provided directly
     df_mcap = to_df_vals(sym_mc[used_mcap_key], "mcap_usd")
-    df_core = pd.merge(df_core, df_mcap, on="date", how="outer").sort_values("date")
+    df_core = (pd.merge(df_core, df_mcap, on="date", how="outer")
+                 .sort_values("date").reset_index(drop=True))
 elif sym_mc is not None and used_mcap_key in supply_candidates:
+    # compute price * circulating supply
     df_sup = to_df_vals(sym_mc[used_mcap_key], "circ_supply")
-    df_tmp = pd.merge(df_core, df_sup, on="date", how="outer").sort_values("date")
-    df_tmp["mcap_usd"] = df_tmp["price"] * df_tmp["circ_supply"]
-    df_core = df_tmp
+    df_core = (pd.merge(df_core, df_sup, on="date", how="outer")
+                 .sort_values("date").reset_index(drop=True))
+    df_core["mcap_usd"] = df_core["price"] * df_core["circ_supply"]
 else:
-    # No supply or mcap returned; we can't compute the chart
-    print("WARN: No market cap or supply metrics found; pct_bought will be NaN")
+    # Helpful debug so you can see what's actually available
+    try:
+        peek = fetch_block("price,*")["data"]["symbols"][ASSET]
+        print("DEBUG: No market cap/supply key matched. Available keys:", list(peek.keys()))
+    except Exception:
+        pass
+    print("WARN: No market cap or supply metrics found; mcap_usd will remain NaN.")
 
-# Share retired (USD proxy): cumulative buybacks / market cap
+# % of supply (proxy) retired
 df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
 
-# Write out
-out_bbmcap = "data/pump_buybacks_vs_mcap.json"
+# Write JSON
 os.makedirs("data", exist_ok=True)
+out_bbmcap = "data/pump_buybacks_vs_mcap.json"
 with open(out_bbmcap, "w") as f:
     json.dump({
         "series": [
@@ -296,5 +303,8 @@ with open(out_bbmcap, "w") as f:
                 df_core["date"], df_core["cum_buybacks_usd"], df_core["mcap_usd"], df_core["pct_bought"]
             )
         ]
+    }, f, indent=2)
+print(f"wrote {out_bbmcap} rows:", len(df_core))
+
     }, f, indent=2)
 print(f"wrote {out_bbmcap} rows:", len(df_core))
