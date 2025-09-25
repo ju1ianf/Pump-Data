@@ -408,3 +408,183 @@ window.__charts = {};
     statsId: "stats-chart-bbmcap"
   });
 })();
+
+// ============ Performance Tab ============
+
+const PERF_RANGES = ["24H", "1W", "1M", "3M", "YTD"];
+const MS_DAY = 24 * 60 * 60 * 1000;
+
+const performanceState = {
+  range: "1M",         // default visible range
+  assetsIndex: null,   // { assets: [{symbol, name, path}] }
+  cache: new Map(),    // symbol -> [{t: Date, p: Number}]
+  initialized: false
+};
+
+// Boot: when user clicks the Performance tab first time
+document.addEventListener("DOMContentLoaded", () => {
+  const perfBtn = document.getElementById("tab-performance");
+  if (!perfBtn) return;
+
+  perfBtn.addEventListener("click", async () => {
+    showTab("performance");
+    if (!performanceState.initialized) {
+      performanceState.initialized = true;
+      await initPerformanceTab();
+    }
+  });
+});
+
+// If you already have a tab switcher, swap this for your own.
+function showTab(k) {
+  document.querySelectorAll(".tab-panel").forEach(el => el.classList.add("hidden"));
+  document.getElementById(`panel-${k}`)?.classList.remove("hidden");
+  document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+  document.querySelector(`.tab[data-tab="${k}"]`)?.classList.add("active");
+}
+
+async function initPerformanceTab() {
+  const idxRes = await fetch("data/assets.json", { cache: "no-store" });
+  performanceState.assetsIndex = await idxRes.json();
+
+  document
+    .querySelectorAll("#panel-performance .rng")
+    .forEach(btn => btn.addEventListener("click", () => {
+      document.querySelectorAll("#panel-performance .rng").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      performanceState.range = btn.dataset.range;
+      renderPerformanceTable();
+    }));
+
+  await renderPerformanceTable();
+}
+
+async function renderPerformanceTable() {
+  const tbody = document.querySelector("#perf-table tbody");
+  tbody.innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
+
+  const rows = [];
+  const now = new Date();
+
+  for (const a of performanceState.assetsIndex.assets) {
+    let series = performanceState.cache.get(a.symbol);
+    if (!series) {
+      try {
+        const res = await fetch(a.path, { cache: "no-store" });
+        const raw = await res.json();
+        series = normalizeSeries(raw);
+        performanceState.cache.set(a.symbol, series);
+      } catch (e) {
+        console.error("Failed to load", a.symbol, e);
+        continue;
+      }
+    }
+    const latest = series.at(-1);
+    if (!latest) continue;
+
+    const pct = computeRangeReturn(series, performanceState.range, now);
+    rows.push({
+      symbol: a.symbol,
+      name: a.name ?? a.symbol,
+      price: latest.p,
+      changePct: pct
+    });
+  }
+
+  rows.sort((a, b) => (b.changePct ?? -Infinity) - (a.changePct ?? -Infinity));
+
+  tbody.innerHTML = "";
+  for (const r of rows) {
+    const up = (r.changePct ?? 0) >= 0;
+    const pctTxt = (r.changePct == null || Number.isNaN(r.changePct))
+      ? "—"
+      : (r.changePct >= 0 ? "+" : "") + r.changePct.toFixed(2) + "%";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="text-align:left;"><strong>${r.name ?? r.symbol}</strong> <span style="opacity:.6">${r.symbol}</span></td>
+      <td>$${formatNumber(r.price)}</td>
+      <td class="${up ? "badge-up" : "badge-down"}">${pctTxt}</td>
+    `;
+    tr.addEventListener("click", () => {
+      // Let your charts know which asset to open.
+      document.dispatchEvent(new CustomEvent("open-asset", { detail: { symbol: r.symbol, display: r.name }}));
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+// Accepts [{t,p}] or [{t,c}] or [{time,close}] (optionally wrapped in {data: [...]})
+function normalizeSeries(payload) {
+  const arr = Array.isArray(payload) ? payload : (payload?.data ?? []);
+  const out = [];
+  for (const row of arr) {
+    let tIso = null, p = null;
+    if (row.t != null) {
+      tIso = typeof row.t === "string" ? row.t : new Date(row.t * 1000).toISOString();
+      p = row.p ?? row.c ?? row.close;
+    } else if (row.time != null) {
+      tIso = typeof row.time === "string" ? row.time : new Date(row.time * 1000).toISOString();
+      p = row.close ?? row.c ?? row.p;
+    } else if (row.timestamp != null) {
+      tIso = typeof row.timestamp === "string" ? row.timestamp : new Date(row.timestamp * 1000).toISOString();
+      p = row.close ?? row.c ?? row.p;
+    }
+    if (tIso != null && p != null && !Number.isNaN(+p)) {
+      out.push({ t: new Date(tIso), p: +p });
+    }
+  }
+  out.sort((a, b) => a.t - b.t);
+  // dedupe any identical timestamps
+  const dedup = [];
+  for (const d of out) {
+    if (!dedup.length || dedup[dedup.length - 1].t.getTime() !== d.t.getTime()) dedup.push(d);
+    else dedup[dedup.length - 1] = d;
+  }
+  return dedup;
+}
+
+function computeRangeReturn(series, range, now) {
+  const end = series.at(-1);
+  if (!end) return null;
+
+  let startTs;
+  switch (range) {
+    case "24H": startTs = now.getTime() - MS_DAY; break;
+    case "1W":  startTs = now.getTime() - 7 * MS_DAY; break;
+    case "1M":  startTs = now.getTime() - 30 * MS_DAY; break;
+    case "3M":  startTs = now.getTime() - 90 * MS_DAY; break;
+    case "YTD": startTs = Date.UTC(now.getUTCFullYear(), 0, 1); break;
+    default:    startTs = now.getTime() - 30 * MS_DAY;
+  }
+
+  const start = interpolatePriceAt(series, startTs);
+  if (start == null || start <= 0) return null;
+  return ((end.p - start) / start) * 100;
+}
+
+function interpolatePriceAt(series, ts) {
+  if (!series?.length) return null;
+  if (ts <= series[0].t.getTime()) return series[0].p;
+  if (ts >= series.at(-1).t.getTime()) return series.at(-1).p;
+
+  let lo = 0, hi = series.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const tmid = series[mid].t.getTime();
+    if (tmid === ts) return series[mid].p;
+    if (tmid < ts) lo = mid + 1; else hi = mid - 1;
+  }
+  const L = series[hi], R = series[lo];
+  const t0 = L.t.getTime(), t1 = R.t.getTime();
+  if (t1 === t0) return L.p;
+  const w = (ts - t0) / (t1 - t0);
+  return L.p + w * (R.p - L.p);
+}
+
+function formatNumber(x) {
+  if (x >= 1) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+// ========== end Performance Tab ==========
+
