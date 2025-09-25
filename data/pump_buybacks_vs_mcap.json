@@ -3,357 +3,499 @@
     {
       "date": "2025-07-17",
       "cum_buybacks_usd": 181424.22929185207,
-      "mcap_usd": 1759776331.50145
+      "mcap_usd": 1759776331.50145,
+      "pct_mcap_bought": 0.00010309505023121887,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-18",
       "cum_buybacks_usd": 349656.00708470005,
-      "mcap_usd": 1495119817.3884
+      "mcap_usd": 1495119817.3884,
+      "pct_mcap_bought": 0.00023386487358281527,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-19",
       "cum_buybacks_usd": 349656.00708470005,
-      "mcap_usd": 1456922768.0424
+      "mcap_usd": 1456922768.0424,
+      "pct_mcap_bought": 0.00023999625426577467,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-20",
       "cum_buybacks_usd": 473796.56480529276,
-      "mcap_usd": 1497812246.22783
+      "mcap_usd": 1497812246.22783,
+      "pct_mcap_bought": 0.00031632573842183974,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-21",
       "cum_buybacks_usd": 473796.56480529276,
-      "mcap_usd": 1474525815.71486
+      "mcap_usd": 1474525815.71486,
+      "pct_mcap_bought": 0.0003213213086917661,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-22",
       "cum_buybacks_usd": 748254.0243418119,
-      "mcap_usd": 1347554895.38006
+      "mcap_usd": 1347554895.38006,
+      "pct_mcap_bought": 0.000555267935211483,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-23",
       "cum_buybacks_usd": 890401.9340356993,
-      "mcap_usd": 1092088949.22678
+      "mcap_usd": 1092088949.22678,
+      "pct_mcap_bought": 0.0008153199743172212,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-24",
       "cum_buybacks_usd": 1001024.7655021738,
-      "mcap_usd": 935204946.594023
+      "mcap_usd": 935204946.594023,
+      "pct_mcap_bought": 0.0010703801013327227,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-25",
       "cum_buybacks_usd": 1102376.575162255,
-      "mcap_usd": 969618766.750017
+      "mcap_usd": 969618766.750017,
+      "pct_mcap_bought": 0.0011369175318844307,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-26",
       "cum_buybacks_usd": 1186421.8377298887,
-      "mcap_usd": 1007139072.85106
+      "mcap_usd": 1007139072.85106,
+      "pct_mcap_bought": 0.0011780119247794707,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-27",
       "cum_buybacks_usd": 1244413.312229877,
-      "mcap_usd": 927213871.284715
+      "mcap_usd": 927213871.284715,
+      "pct_mcap_bought": 0.0013420995422616592,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-28",
       "cum_buybacks_usd": 1468688.2313542548,
-      "mcap_usd": 863153830.33858
+      "mcap_usd": 863153830.33858,
+      "pct_mcap_bought": 0.0017015370606397568,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-29",
       "cum_buybacks_usd": 1985162.7177219745,
-      "mcap_usd": 993969430.630203
+      "mcap_usd": 993969430.630203,
+      "pct_mcap_bought": 0.001997207013160685,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-30",
       "cum_buybacks_usd": 2302468.252273837,
-      "mcap_usd": 975743970.121101
+      "mcap_usd": 975743970.121101,
+      "pct_mcap_bought": 0.002359705335394565,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-07-31",
       "cum_buybacks_usd": 2483700.552614261,
-      "mcap_usd": 888628838.083523
+      "mcap_usd": 888628838.083523,
+      "pct_mcap_bought": 0.002794980813328968,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-01",
       "cum_buybacks_usd": 2721083.264739401,
-      "mcap_usd": 909916724.897329
+      "mcap_usd": 909916724.897329,
+      "pct_mcap_bought": 0.0029904750514904935,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-02",
       "cum_buybacks_usd": 2921692.4532603626,
-      "mcap_usd": 978071784.828355
+      "mcap_usd": 978071784.828355,
+      "pct_mcap_bought": 0.0029871963373047307,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-03",
       "cum_buybacks_usd": 3248627.7612618348,
-      "mcap_usd": 1031296435.44986
+      "mcap_usd": 1031296435.44986,
+      "pct_mcap_bought": 0.003150042654656085,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-04",
       "cum_buybacks_usd": 3462997.5051879855,
-      "mcap_usd": 1107237536.30247
+      "mcap_usd": 1107237536.30247,
+      "pct_mcap_bought": 0.003127601252349505,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-05",
       "cum_buybacks_usd": 3783912.136083559,
-      "mcap_usd": 1148351686.13738
+      "mcap_usd": 1148351686.13738,
+      "pct_mcap_bought": 0.0032950812732388686,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-06",
       "cum_buybacks_usd": 4613083.454788555,
-      "mcap_usd": 1211174559.65553
+      "mcap_usd": 1211174559.65553,
+      "pct_mcap_bought": 0.0038087684537401133,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-07",
       "cum_buybacks_usd": 6353847.247389911,
-      "mcap_usd": 1262306590.89841
+      "mcap_usd": 1262306590.89841,
+      "pct_mcap_bought": 0.005033521406925194,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-08",
       "cum_buybacks_usd": 7802079.66061771,
-      "mcap_usd": 1200064230.48297
+      "mcap_usd": 1200064230.48297,
+      "pct_mcap_bought": 0.0065013850612627095,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-09",
       "cum_buybacks_usd": 7802079.66061771,
-      "mcap_usd": 1111442243.59053
+      "mcap_usd": 1111442243.59053,
+      "pct_mcap_bought": 0.0070197796652149745,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-10",
       "cum_buybacks_usd": 10573460.232147269,
-      "mcap_usd": 1102326514.96878
+      "mcap_usd": 1102326514.96878,
+      "pct_mcap_bought": 0.009591949471021051,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-11",
       "cum_buybacks_usd": 12035181.44294303,
-      "mcap_usd": 1217619324.98764
+      "mcap_usd": 1217619324.98764,
+      "pct_mcap_bought": 0.009884190564292496,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-12",
       "cum_buybacks_usd": 14250349.108813277,
-      "mcap_usd": 1415383319.35451
+      "mcap_usd": 1415383319.35451,
+      "pct_mcap_bought": 0.010068190654749409,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-13",
       "cum_buybacks_usd": 16306167.764370369,
-      "mcap_usd": 1407412159.60296
+      "mcap_usd": 1407412159.60296,
+      "pct_mcap_bought": 0.011585922185701765,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-14",
       "cum_buybacks_usd": 18708455.84475147,
-      "mcap_usd": 1278260381.85512
+      "mcap_usd": 1278260381.85512,
+      "pct_mcap_bought": 0.014635872401521333,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-15",
       "cum_buybacks_usd": 20553820.21302099,
-      "mcap_usd": 1228689138.16776
+      "mcap_usd": 1228689138.16776,
+      "pct_mcap_bought": 0.016728250925755854,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-16",
       "cum_buybacks_usd": 22219529.046443027,
-      "mcap_usd": 1234760258.31217
+      "mcap_usd": 1234760258.31217,
+      "pct_mcap_bought": 0.01799501473817723,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-17",
       "cum_buybacks_usd": 23846602.547451396,
-      "mcap_usd": 1296507180.92417
+      "mcap_usd": 1296507180.92417,
+      "pct_mcap_bought": 0.018392958325501273,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-18",
       "cum_buybacks_usd": 25249794.00711997,
-      "mcap_usd": 1101172731.10031
+      "mcap_usd": 1101172731.10031,
+      "pct_mcap_bought": 0.02292991216908355,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-19",
       "cum_buybacks_usd": 27028225.433650166,
-      "mcap_usd": 997022812.433636
+      "mcap_usd": 997022812.433636,
+      "pct_mcap_bought": 0.027108933814339604,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-20",
       "cum_buybacks_usd": 28465624.087598857,
-      "mcap_usd": 1110307998.412
+      "mcap_usd": 1110307998.412,
+      "pct_mcap_bought": 0.02563759256738793,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-21",
       "cum_buybacks_usd": 29955495.34251584,
-      "mcap_usd": 992708702.838074
+      "mcap_usd": 992708702.838074,
+      "pct_mcap_bought": 0.030175513981972255,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-22",
       "cum_buybacks_usd": 31179443.20531206,
-      "mcap_usd": 1134628463.51925
+      "mcap_usd": 1134628463.51925,
+      "pct_mcap_bought": 0.02747987046667552,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-23",
       "cum_buybacks_usd": 33282759.75848075,
-      "mcap_usd": 1109055963.57715
+      "mcap_usd": 1109055963.57715,
+      "pct_mcap_bought": 0.030009991246186085,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-24",
       "cum_buybacks_usd": 34767238.13220445,
-      "mcap_usd": 1036860337.14563
+      "mcap_usd": 1036860337.14563,
+      "pct_mcap_bought": 0.033531264420736825,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-25",
       "cum_buybacks_usd": 36019506.19898202,
-      "mcap_usd": 936290689.495976
+      "mcap_usd": 936290689.495976,
+      "pct_mcap_bought": 0.03847043082140659,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-26",
       "cum_buybacks_usd": 37719223.91813559,
-      "mcap_usd": 1017030313.23104
+      "mcap_usd": 1017030313.23104,
+      "pct_mcap_bought": 0.03708761029777376,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-27",
       "cum_buybacks_usd": 39724823.15937736,
-      "mcap_usd": 1064576967.8326
+      "mcap_usd": 1064576967.8326,
+      "pct_mcap_bought": 0.03731512550027657,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-28",
       "cum_buybacks_usd": 42366407.20998361,
-      "mcap_usd": 1241440679.25316
+      "mcap_usd": 1241440679.25316,
+      "pct_mcap_bought": 0.03412680760185084,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-29",
       "cum_buybacks_usd": 44582011.846674725,
-      "mcap_usd": 1240708969.41127
+      "mcap_usd": 1240708969.41127,
+      "pct_mcap_bought": 0.03593269086128182,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-30",
       "cum_buybacks_usd": 46200640.50357663,
-      "mcap_usd": 1215940714.26611
+      "mcap_usd": 1215940714.26611,
+      "pct_mcap_bought": 0.037995800256973356,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-08-31",
       "cum_buybacks_usd": 47518048.967851125,
-      "mcap_usd": 1186621874.40167
+      "mcap_usd": 1186621874.40167,
+      "pct_mcap_bought": 0.040044811235096386,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-01",
       "cum_buybacks_usd": 48828061.1122349,
-      "mcap_usd": 1200522645.36263
+      "mcap_usd": 1200522645.36263,
+      "pct_mcap_bought": 0.040672336586775416,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-02",
       "cum_buybacks_usd": 50393662.00320931,
-      "mcap_usd": 1383147643.40756
+      "mcap_usd": 1383147643.40756,
+      "pct_mcap_bought": 0.036434043931172895,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-03",
       "cum_buybacks_usd": 52352456.68367761,
-      "mcap_usd": 1442331004.81903
+      "mcap_usd": 1442331004.81903,
+      "pct_mcap_bought": 0.03629711661800288,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-04",
       "cum_buybacks_usd": 54780180.23951901,
-      "mcap_usd": 1513840347.92256
+      "mcap_usd": 1513840347.92256,
+      "pct_mcap_bought": 0.0361862334523543,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-05",
       "cum_buybacks_usd": 56904966.779006444,
-      "mcap_usd": 1640769041.4815
+      "mcap_usd": 1640769041.4815,
+      "pct_mcap_bought": 0.034681887176287306,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-06",
       "cum_buybacks_usd": 58774616.864941604,
-      "mcap_usd": 1607218453.66139
+      "mcap_usd": 1607218453.66139,
+      "pct_mcap_bought": 0.03656915258224398,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-07",
       "cum_buybacks_usd": 60402010.12899826,
-      "mcap_usd": 1725308409.14462
+      "mcap_usd": 1725308409.14462,
+      "pct_mcap_bought": 0.035009398788558965,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-08",
       "cum_buybacks_usd": 61655512.09956435,
-      "mcap_usd": 1681166531.43681
+      "mcap_usd": 1681166531.43681,
+      "pct_mcap_bought": 0.03667424430991404,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-09",
       "cum_buybacks_usd": 64225587.75963854,
-      "mcap_usd": 1688866373.31951
+      "mcap_usd": 1688866373.31951,
+      "pct_mcap_bought": 0.038028815526358964,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-10",
       "cum_buybacks_usd": 66446225.058456965,
-      "mcap_usd": 1993475838.40093
+      "mcap_usd": 1993475838.40093,
+      "pct_mcap_bought": 0.033331843696564147,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-11",
       "cum_buybacks_usd": 69199722.61948888,
-      "mcap_usd": 2105708819.40303
+      "mcap_usd": 2105708819.40303,
+      "pct_mcap_bought": 0.03286291152026758,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-12",
       "cum_buybacks_usd": 71519247.38137096,
-      "mcap_usd": 2194299325.24307
+      "mcap_usd": 2194299325.24307,
+      "pct_mcap_bought": 0.032593204837014896,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-13",
       "cum_buybacks_usd": 74129730.80593917,
-      "mcap_usd": 2634167227.15647
+      "mcap_usd": 2634167227.15647,
+      "pct_mcap_bought": 0.02814161912034746,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-14",
       "cum_buybacks_usd": 76164253.7545955,
-      "mcap_usd": 2830685446.65814
+      "mcap_usd": 2830685446.65814,
+      "pct_mcap_bought": 0.026906646884596007,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-15",
       "cum_buybacks_usd": 79338361.84296958,
-      "mcap_usd": 3045629053.89209
+      "mcap_usd": 3045629053.89209,
+      "pct_mcap_bought": 0.026049909703081204,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-16",
       "cum_buybacks_usd": 82511621.15170231,
-      "mcap_usd": 2767475482.15133
+      "mcap_usd": 2767475482.15133,
+      "pct_mcap_bought": 0.02981476138952491,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-17",
       "cum_buybacks_usd": 85514465.19974509,
-      "mcap_usd": 2903142835.92087
+      "mcap_usd": 2903142835.92087,
+      "pct_mcap_bought": 0.029455824267985115,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-18",
       "cum_buybacks_usd": 87761155.29465511,
-      "mcap_usd": 2766128480.46881
+      "mcap_usd": 2766128480.46881,
+      "pct_mcap_bought": 0.03172707121680087,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-19",
       "cum_buybacks_usd": 89511253.44249551,
-      "mcap_usd": 2537820430.82535
+      "mcap_usd": 2537820430.82535,
+      "pct_mcap_bought": 0.035270916868371444,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-20",
       "cum_buybacks_usd": 91453494.34271081,
-      "mcap_usd": 2470761845.48516
+      "mcap_usd": 2470761845.48516,
+      "pct_mcap_bought": 0.03701428954386049,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-21",
       "cum_buybacks_usd": 92782480.91863422,
-      "mcap_usd": 2315311077.06499
+      "mcap_usd": 2315311077.06499,
+      "pct_mcap_bought": 0.04007344060058235,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-22",
       "cum_buybacks_usd": 93939460.15978825,
-      "mcap_usd": 2012376743.71135
+      "mcap_usd": 2012376743.71135,
+      "pct_mcap_bought": 0.04668085161158207,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-23",
       "cum_buybacks_usd": 95277917.38756815,
-      "mcap_usd": 2066342823.58366
+      "mcap_usd": 2066342823.58366,
+      "pct_mcap_bought": 0.04610944336057827,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-24",
       "cum_buybacks_usd": 96517300.10112417,
-      "mcap_usd": 1994199688.53668
+      "mcap_usd": 1994199688.53668,
+      "pct_mcap_bought": 0.04839901473053956,
+      "pct_circ_retired": null
     },
     {
       "date": "2025-09-25",
       "cum_buybacks_usd": 96517300.10112417,
-      "mcap_usd": 1857488041.0
+      "mcap_usd": 1823467300.0,
+      "pct_mcap_bought": 0.05293064487700118,
+      "pct_circ_retired": null
     }
   ]
 }
