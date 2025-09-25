@@ -1,0 +1,23 @@
+{
+  "assets": [
+    { "symbol": "HYPE",   "name": "HYPE",   "path": "data/perf/HYPE.json" },
+    { "symbol": "SOL",    "name": "SOL",    "path": "data/perf/SOL.json" },
+    { "symbol": "ETH",    "name": "ETH",    "path": "data/perf/ETH.json" },
+    { "symbol": "BTC",    "name": "BTC",    "path": "data/perf/BTC.json" },
+    { "symbol": "PUMP",   "name": "PUMP",   "path": "data/perf/PUMP.json" },
+    { "symbol": "BERA",   "name": "BERA",   "path": "data/perf/BERA.json" },
+    { "symbol": "IP",     "name": "IP",     "path": "data/perf/IP.json" },
+    { "symbol": "TAO",    "name": "TAO",    "path": "data/perf/TAO.json" },
+    { "symbol": "ETHFI",  "name": "ETHFI",  "path": "data/perf/ETHFI.json" },
+    { "symbol": "MOVE",   "name": "MOVE",   "path": "data/perf/MOVE.json" },
+    { "symbol": "EQ-FORD","name": "FORD","path": "data/perf/EQ-FORD.json" },
+    { "symbol": "EQ-BMNR","name": "BMNR","path": "data/perf/EQ-BMNR.json" },
+    { "symbol": "EQ-MSTR","name": "MSTR","path": "data/perf/EQ-MSTR.json" },
+    { "symbol": "EQ-SPY", "name": "SPY", "path": "data/perf/EQ-SPY.json" },
+    { "symbol": "EQ-QQQ", "name": "QQQ", "path": "data/perf/EQ-QQQ.json" },
+    { "symbol": "EQ-GLXY","name": "GLXY","path": "data/perf/EQ-GLXY.json" },
+    { "symbol": "EQ-COIN","name": "COIN","path": "data/perf/EQ-COIN.json" },
+    { "symbol": "EQ-HOOD","name": "HOOD","path": "data/perf/EQ-HOOD.json" },
+    { "symbol": "EQ-CRCL","name": "CRCL","path": "data/perf/EQ-CRCL.json" }
+  ]
+}
