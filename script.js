@@ -432,7 +432,7 @@ window.__charts = {};
 
   // ---- Relative chart state ----
   const rel = {
-    selected: new Set(["BTC","ETH","SOL","PUMP","HYPE","SPY","QQQ"]), // default picks; will only render if present
+    selected: new Set(["BTC","ETH","SOL","PUMP","HYPE","SPY","QQQ"]), // defaults
     chart: null,
   };
 
@@ -496,6 +496,7 @@ window.__charts = {};
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.2,
+        parsing: false
       });
     }
 
@@ -507,14 +508,25 @@ window.__charts = {};
         data: { datasets },
         options: {
           responsive: true,
-          interaction: { mode: "nearest", intersect: false },
+          // <<< SHOW ALL SERIES AT HOVERED X >>>
+          interaction: { mode: "index", intersect: false, axis: "x" },
+          hover: { mode: "index", intersect: false },
           plugins: {
             legend: { position: "top" },
             tooltip: {
+              itemSort: (a, b) => (b.parsed?.y ?? 0) - (a.parsed?.y ?? 0),
               callbacks: {
+                title: (items) => {
+                  const d = new Date(items[0].parsed.x || items[0].label);
+                  return d.toLocaleString(undefined, {
+                    year: "numeric", month: "short", day: "numeric",
+                    hour: "2-digit", minute: "2-digit"
+                  });
+                },
                 label: (c) => {
                   const v = c.parsed.y;
-                  return `${c.dataset.label}: ${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+                  const sign = v >= 0 ? "+" : "";
+                  return `${c.dataset.label}: ${sign}${(v ?? 0).toFixed(2)}%`;
                 }
               }
             }
@@ -535,7 +547,7 @@ window.__charts = {};
     }
   }
 
-  // ---- table rendering (unchanged logic) ----
+  // ---- table rendering ----
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -636,7 +648,4 @@ window.__charts = {};
     }
   });
 })();
-
-
-
 
