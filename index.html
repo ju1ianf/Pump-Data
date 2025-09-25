@@ -41,7 +41,7 @@
     .tabs{
       display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 18px;
       border-bottom:1px solid var(--rule); padding-bottom:10px;
-      justify-content:center;         /* centered */
+      justify-content:center;
     }
     .tabs a{
       text-decoration:none; color:var(--tabOff); background:var(--tabBg);
@@ -53,7 +53,7 @@
     /* Section headings + canvases */
     h2{
       font-family:var(--heading-font);
-      font-size:22px;            /* larger */
+      font-size:22px;
       font-weight:700;
       text-align:center;
       margin:22px 0 8px;
@@ -75,7 +75,7 @@
       display:grid;
       grid-template-columns: 1fr 280px;
       gap:24px;
-      align-items:center;         /* center stat card next to chart */
+      align-items:center;
       margin: 18px 0 36px;
     }
     @media (max-width: 1000px){
@@ -87,7 +87,7 @@
       padding:12px;
       background:#fff;
       min-height:120px;
-      align-self:center;          /* keep centered vertically */
+      align-self:center;
     }
 
     /* Dynamic stat cards (inserted by script.js) */
@@ -111,7 +111,7 @@
     /* Rows: tighter label ↔ value spacing */
     .stat-row{
       display:grid;
-      grid-template-columns: 3.2rem 1fr;  /* '1M/1W' width, then value */
+      grid-template-columns: 3.2rem 1fr;
       gap:8px;
       align-items:center;
       padding:3px 0;
@@ -119,13 +119,13 @@
     .stat-row span:first-child{ color:#333; }
     .stat-row strong{
       justify-self:end;
-      font-feature-settings:"tnum" 1;   /* tabular numbers */
+      font-feature-settings:"tnum" 1;
       letter-spacing:.2px;
     }
     .stat-row strong.pos { color:#0a7a3c; }
     .stat-row strong.neg { color:#b21c1c; }
 
-    /* (Unused table fallback kept for future) */
+    /* (Table fallback — kept if you later swap) */
     .statbox h3{ margin:0 0 8px; font-family: var(--heading-font); font-size:16px; text-align:left; }
     .statbox table{ width:100%; border-collapse:collapse; font-size:14px; }
     .statbox th, .statbox td{ padding:6px 6px; border-bottom:1px solid #f0f0f0; text-align:right; }
@@ -157,7 +157,7 @@
 
     <!-- Pump tab -->
     <section id="pane-pump" class="tabpane active">
-      <!-- Fees -->
+      <!-- Price vs Fees -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Fees</h2>
@@ -169,11 +169,10 @@
           </div>
           <canvas id="chart"></canvas>
         </div>
-        <!-- ID must be exactly 'stats-chart' for script.js -->
         <aside class="statbox" id="stats-chart"></aside>
       </div>
 
-      <!-- Revenue -->
+      <!-- Price vs Revenue -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Revenue</h2>
@@ -185,11 +184,10 @@
           </div>
           <canvas id="chart-revenue"></canvas>
         </div>
-        <!-- ID must be exactly 'stats-chart-rev' for script.js -->
         <aside class="statbox" id="stats-chart-rev"></aside>
       </div>
 
-      <!-- Buybacks -->
+      <!-- Price vs Buybacks (USD) -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Buybacks (USD)</h2>
@@ -201,7 +199,6 @@
           </div>
           <canvas id="chart-buybacks"></canvas>
         </div>
-        <!-- ID must be exactly 'stats-chart-bb' for script.js -->
         <aside class="statbox" id="stats-chart-bb"></aside>
       </div>
 
@@ -278,4 +275,5 @@
   <script src="script.js"></script>
 </body>
 </html>
+
 
