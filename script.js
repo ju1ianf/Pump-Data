@@ -13,17 +13,6 @@ const ET_TZ = "America/New_York";
 const fmtET = (date, opts = {}) =>
   new Intl.DateTimeFormat(undefined, { timeZone: ET_TZ, ...opts }).format(date);
 
-// ---- Chart.js global defaults: shared hover like Performance ----
-if (window.Chart) {
-  Chart.defaults.responsive = true;
-  // do NOT set a global maintainAspectRatio; we pin heights per chart
-  Chart.defaults.interaction = { mode: "index", axis: "x", intersect: false };
-  Chart.defaults.plugins.tooltip.enabled = true;
-  Chart.defaults.plugins.tooltip.mode = "index";
-  Chart.defaults.plugins.tooltip.intersect = false;
-  Chart.defaults.plugins.tooltip.position = "nearest";
-}
-
 function latestOnOrBefore(rows, key, cutoff) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const d = new Date(rows[i].date);
@@ -94,7 +83,7 @@ function filterByRange(series, token) {
 /* Utility: map rows to time points with real Date objects */
 const toPts = (rows, key) => rows.map(d => ({ x: new Date(d.date), y: d[key] }));
 
-/* Ensure a canvas has fixed height so it can't stretch the page */
+/* Ensure a canvas has fixed height so it can't stretch the page (PUMP only) */
 function pinCanvasHeight(canvas, h = 420) {
   if (!canvas) return;
   canvas.height = h;                // drawing buffer
@@ -119,7 +108,7 @@ async function makeDualAxis({
 
     const cnv = document.getElementById(el);
     if (!cnv) return null;
-    pinCanvasHeight(cnv, 420); // <<< keep it structured
+    pinCanvasHeight(cnv, 420); // keep PUMP charts structured
 
     const chart = new Chart(cnv.getContext("2d"), {
       type: "line",
@@ -127,7 +116,7 @@ async function makeDualAxis({
         datasets: [
           {
             label: leftLabel,
-            data: toPts(series, leftKey), // [{x,y}]
+            data: toPts(series, leftKey),
             parsing: true,
             yAxisID: "yL",
             tension: .25,
@@ -158,7 +147,7 @@ async function makeDualAxis({
         ]
       },
       options: {
-        maintainAspectRatio: false, // respect the pinned height
+        maintainAspectRatio: false, // respect pinned height
         interaction: { mode: "index", axis: "x", intersect: false },
         plugins: {
           legend: { position: "top" },
@@ -207,7 +196,7 @@ async function makeDualAxis({
       }
     });
 
-    // Attach range buttons
+    // Range buttons
     const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
     if (toolbar) {
       toolbar.addEventListener("click", (e) => {
@@ -291,7 +280,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
 
     const cnv = document.getElementById(el);
     if (!cnv) return null;
-    pinCanvasHeight(cnv, 420); // <<< keep it structured
+    pinCanvasHeight(cnv, 420); // keep PUMP chart structured
 
     const pctPts = (rows) =>
       rows.map(d => ({
@@ -416,9 +405,9 @@ window.__charts = {};
   const MS_DAY  = 24 * MS_HOUR;
 
   const state = {
-    range: "YTD",
+    range: "YTD",          // default
     assetsIndex: null,
-    cache: new Map(),
+    cache: new Map(),      // symbol -> [{t: Date, p: number}]
     initialized: false,
   };
 
@@ -612,6 +601,7 @@ window.__charts = {};
         type: "line",
         data: { datasets },
         options: {
+          maintainAspectRatio: false,   // <<< restored so canvas matches CSS height (sharp, correct size)
           interaction: { mode: "index", axis: "x", intersect: false },
           plugins: {
             legend: { position: "top" },
