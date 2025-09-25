@@ -69,7 +69,7 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   `;
 }
 
-/* Range filters */
+/* Range filters for the PUMP charts */
 function filterByRange(series, token) {
   if (token === "ALL") return series;
   const now = new Date(series[series.length - 1].date);
@@ -164,9 +164,9 @@ async function makeDualAxis({
             type: "time",
             time: { unit: "day" },
             ticks: {
-              callback: (value) => {
-                const d = new Date(+value);
-                return fmtET(d, { month:"short", day:"numeric" });
+              callback: (value, i, ticks) => {
+                const ts = ticks?.[i]?.value ?? value;
+                return fmtET(new Date(ts), { month:"short", day:"numeric" });
               }
             }
           },
@@ -314,9 +314,9 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
             type: "time",
             time: { unit: "day" },
             ticks: {
-              callback: (value) => {
-                const d = new Date(+value);
-                return fmtET(d, { month:"short", day:"numeric" });
+              callback: (value, i, ticks) => {
+                const ts = ticks?.[i]?.value ?? value;
+                return fmtET(new Date(ts), { month:"short", day:"numeric" });
               }
             }
           },
@@ -384,7 +384,7 @@ window.__charts = {};
   });
 })();
 
-// ============ Performance Tab (table + relative chart) ============
+/* ============ Performance Tab (table + relative chart) ============ */
 (() => {
   const MS_HOUR = 60 * 60 * 1000;
   const MS_DAY  = 24 * MS_HOUR;
@@ -586,16 +586,17 @@ window.__charts = {};
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.2,
-        parsing: true            // we use {x,y}, Chart.js will parse these keys
+        parsing: true,           // use x/y from objects
+        spanGaps: true
       });
     }
 
     // Create or update chart
     const ctx = canvas.getContext("2d");
     const xUnit = (state.range === "24H") ? "hour" : "day";
-    const tooltipLabel = (ts) =>
+    const tooltipTitle = (ts) =>
       new Date(ts).toLocaleString(undefined, {
-        timeZone: "America/New_York",
+        timeZone: ET_TZ,
         month: "short", day: "numeric",
         hour: xUnit === "hour" ? "numeric" : undefined,
         minute: xUnit === "hour" ? "2-digit" : undefined
@@ -608,12 +609,13 @@ window.__charts = {};
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: false,
           interaction: { mode: "index", intersect: false }, // shared tooltip
           plugins: {
             legend: { position: "top" },
             tooltip: {
               callbacks: {
-                title: (items) => items?.length ? tooltipLabel(items[0].parsed.x) : "",
+                title: (items) => items?.length ? tooltipTitle(items[0].parsed.x) : "",
                 label: (c) => `${c.dataset.label}: ${(c.parsed.y >= 0 ? "+" : "")}${c.parsed.y.toFixed(2)}%`,
               }
             }
@@ -623,10 +625,10 @@ window.__charts = {};
               type: "time",
               time: { unit: xUnit },
               ticks: {
-                callback: (v) => {
-                  const d = new Date(v);
-                  return d.toLocaleString(undefined, {
-                    timeZone: "America/New_York",
+                callback: (value, i, ticks) => {
+                  const ts = ticks?.[i]?.value ?? value;
+                  return new Date(ts).toLocaleString(undefined, {
+                    timeZone: ET_TZ,
                     month: (xUnit === "day") ? "short" : undefined,
                     day:   (xUnit === "day") ? "numeric" : undefined,
                     hour:  (xUnit === "hour") ? "numeric" : undefined
@@ -648,7 +650,7 @@ window.__charts = {};
     }
   }
 
-  // --------- Table rendering (unchanged except it uses the same range) ---------
+  // --------- Table rendering ---------
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -748,6 +750,7 @@ window.__charts = {};
     }
   });
 })();
+
 
 
 
