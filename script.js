@@ -113,6 +113,24 @@ async function makeDualAxis({
     return { chart: null, series: [] };
   }
 
+  // Key fallbacks (helps if backend field names change)
+  const altKeys = {
+    [leftKey]: leftKey === "buybacks_usd" ? ["buybacks", "buybacks_native"] :
+               leftKey === "revenue" ? ["protocol_revenue", "revenue_usd"] :
+               leftKey === "fees" ? ["total_fees", "fees_usd"] : [],
+    [rightKey]: rightKey === "price" ? ["price_usd"] : []
+  };
+  function resolveKey(primary) {
+    const candidates = [primary, ...(altKeys[primary] || [])];
+    for (const k of candidates) {
+      const hasAny = series.some(r => Number.isFinite(r?.[k]));
+      if (hasAny) return k;
+    }
+    return primary; // fall back to original
+  }
+  leftKey = resolveKey(leftKey);
+  rightKey = resolveKey(rightKey);
+
   // one-time stats render (full history)
   renderStatsBox(statsId, series, leftKey, rightKey);
 
