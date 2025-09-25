@@ -29,7 +29,6 @@
       font-family:var(--heading-font);
       font-size:44px; line-height:1.1; margin:0; text-align:center; letter-spacing:-0.5px;
     }
-    /* Align the “1” in F1 with the F cap height */
     .f1{ display:inline-flex; align-items:flex-end; }
     .f1 .f{ font-size:1em; line-height:1; }
     .f1 .one{
@@ -90,38 +89,18 @@
       align-self:center;
     }
 
-    /* Dynamic stat cards (inserted by script.js) */
+    /* Dynamic stat cards */
     .stat-card + .stat-card { margin-top:10px; }
-
-    /* Title row shows 'Change' header on the right */
     .stat-title{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      font-weight:700;
-      margin-bottom:6px;
+      display:flex; justify-content:space-between; align-items:center;
+      font-weight:700; margin-bottom:6px;
     }
-    .stat-title::after{
-      content:"Change";
-      color:#777;
-      font-weight:600;
-      font-size:12px;
-    }
-
-    /* Rows */
+    .stat-title::after{ content:"Change"; color:#777; font-weight:600; font-size:12px; }
     .stat-row{
-      display:grid;
-      grid-template-columns: 3.2rem 1fr;
-      gap:8px;
-      align-items:center;
-      padding:3px 0;
+      display:grid; grid-template-columns: 3.2rem 1fr; gap:8px; align-items:center; padding:3px 0;
     }
     .stat-row span:first-child{ color:#333; }
-    .stat-row strong{
-      justify-self:end;
-      font-feature-settings:"tnum" 1;
-      letter-spacing:.2px;
-    }
+    .stat-row strong{ justify-self:end; font-feature-settings:"tnum" 1; letter-spacing:.2px; }
     .stat-row strong.pos { color:#0a7a3c; }
     .stat-row strong.neg { color:#b21c1c; }
 
@@ -145,9 +124,11 @@
     #perf-table tbody tr { cursor:pointer; }
 
     /* NEW: relative performance picker + chart */
-    .asset-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px;max-height:112px;overflow:auto;}
+    .relperf{ margin-top:8px; }
+    .asset-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px;max-height:112px;overflow:auto;}
     .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
     .asset-btn.on{background:#111;color:#fff;border-color:#111;}
+    .tz-note{ text-align:right; color:#666; font-size:12px; margin:0 4px 6px; }
     #relperf-chart{height:380px;max-width:100%;background:#fff;}
   </style>
 </head>
@@ -219,7 +200,7 @@
       <div class="chart-row">
         <div>
           <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
-          <div class="toolbar" data-for="chart-bbmcap">
+        <div class="toolbar" data-for="chart-bbmcap">
             <button class="on" data-range="ALL">All</button>
             <button data-range="3M">3M</button>
             <button data-range="1M">1M</button>
@@ -265,6 +246,7 @@
       <!-- NEW: Relative performance block -->
       <div class="relperf">
         <div id="relperf-picker" class="asset-picker"></div>
+        <div class="tz-note">Times shown in Eastern Time (ET)</div>
         <canvas id="relperf-chart"></canvas>
       </div>
 
@@ -329,3 +311,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
