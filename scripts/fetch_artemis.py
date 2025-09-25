@@ -210,7 +210,7 @@ resp_bb = API.fetch_metrics(
     end_date=END,
 )
 sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
-df_bb = to_df_vals(sym_bb.get("buybacks", []), "buybacks_usd")
+df_bb = to_df_vals(sym.get("buybacks", []), "buybacks")
 
 # Cumulative buybacks directly
 df_bb["cum_buybacks_usd"] = df_bb["buybacks_usd"].fillna(0).cumsum()
@@ -260,23 +260,16 @@ if "mcap_usd" in df_core:
     df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
 
 # Write file
-out_file = "data/pump_mcap_buybacks.json"
-os.makedirs("data", exist_ok=True)
+out_file = "data/pump_buybacks.json"
 with open(out_file, "w") as f:
     json.dump({
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
-                "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
-                "mcap_usd":         None if pd.isna(mc) else float(mc),
-                "pct_bought":       None if pd.isna(pb) else float(pb),
+                "price": None if pd.isna(p) else float(p),
+                "buybacks": None if pd.isna(b) else float(b),
             }
-            for d, cb, mc, pb in zip(
-                df_core["date"],
-                df_core["cum_buybacks_usd"],
-                df_core.get("mcap_usd", [pd.NA]*len(df_core)),
-                df_core.get("pct_bought", [pd.NA]*len(df_core)),
-            )
+            for d, p, b in zip(df_price["date"], df_price["price"], df_bb["buybacks"])
         ]
     }, f, indent=2)
 
