@@ -338,18 +338,19 @@ window.__charts = {};
   });
 })();
 
-/* ============ Performance Tab (fixed wiring + YTD) ============ */
+// ============ Performance Tab (table + relative chart) ============
 
 (() => {
   const MS_DAY = 24 * 60 * 60 * 1000;
 
   const state = {
-    range: "YTD",
+    range: "YTD",          // default
     assetsIndex: null,
-    cache: new Map(),
+    cache: new Map(),      // symbol -> [{t: Date, p: number}]
     initialized: false,
   };
 
+  // ---- helpers ----
   function startOfDayUTC(date) {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }
@@ -357,15 +358,16 @@ window.__charts = {};
   function makeBaselineStartTs(range, nowUTC = new Date()) {
     const now = nowUTC;
     switch (range) {
-      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();
-      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();
-      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
-      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();
-      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);
+      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();   // yesterday 00:00Z
+      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();   // 7 days ago 00:00Z
+      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();  // 30 days ago 00:00Z
+      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();  // 90 days ago 00:00Z
+      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                             // Jan 1 00:00Z
       default:    return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
     }
   }
 
+  // first price ON/AFTER baseline; if baseline precedes series, use earliest
   function baselinePriceOnOrAfter(series, baselineTs) {
     if (!series?.length) return null;
     let lo = 0, hi = series.length - 1, ans = -1;
@@ -375,7 +377,7 @@ window.__charts = {};
       if (t >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
     }
     if (ans !== -1) return series[ans].p;
-    return series[0].p; // earliest if baseline precedes series
+    return series[0].p;
   }
 
   function computePctChange(series, range, now = new Date()) {
@@ -403,9 +405,12 @@ window.__charts = {};
         tIso = typeof row.timestamp === "string" ? row.timestamp : new Date(row.timestamp * 1000).toISOString();
         p = row.close ?? row.c ?? row.p ?? row.price;
       }
-      if (tIso != null && p != null && !Number.isNaN(+p)) out.push({ t: new Date(tIso), p: +p });
+      if (tIso != null && p != null && !Number.isNaN(+p)) {
+        out.push({ t: new Date(tIso), p: +p });
+      }
     }
     out.sort((a, b) => a.t - b.t);
+    // dedupe exact-timestamp dupes
     const dedup = [];
     for (const d of out) {
       if (!dedup.length || dedup[dedup.length - 1].t.getTime() !== d.t.getTime()) dedup.push(d);
@@ -417,31 +422,120 @@ window.__charts = {};
   function formatNumber(x) {
     if (x >= 1) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
     return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
-    }
-
-  async function init() {
-    const idxRes = await fetch("data/assets.json", { cache: "no-store" });
-    state.assetsIndex = await idxRes.json();
-
-    // Delegated click handler with preventDefault (so anchor pills work)
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest('#pane-performance [data-range], .perf-controls [data-range]');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const group = btn.closest('#pane-performance') || document;
-      group.querySelectorAll('[data-range]').forEach(b => b.classList.toggle("active", b === btn));
-      state.range = btn.dataset.range;
-      renderTable();
-    });
-
-    const ytdBtn = document.querySelector('#pane-performance [data-range="YTD"]') ||
-                   document.querySelector('.perf-controls [data-range="YTD"]');
-    if (ytdBtn) ytdBtn.classList.add("active");
-
-    await renderTable();
   }
 
+  // deterministic color per symbol
+  function colorFor(sym) {
+    let h = 0; for (let i=0;i<sym.length;i++) h = (h*31 + sym.charCodeAt(i)) >>> 0;
+    return `hsl(${h%360} 70% 45%)`;
+  }
+
+  // ---- Relative chart state ----
+  const rel = {
+    selected: new Set(["BTC","ETH","SOL","PUMP","HYPE","SPY","QQQ"]), // default picks; will only render if present
+    chart: null,
+  };
+
+  // ---- UI builders ----
+  function buildPicker() {
+    const box = document.getElementById("relperf-picker");
+    if (!box || !state.assetsIndex) return;
+
+    box.innerHTML = "";
+    state.assetsIndex.assets.forEach(a => {
+      const btn = document.createElement("button");
+      btn.className = "asset-btn" + (rel.selected.has(a.symbol) ? " on" : "");
+      btn.textContent = a.name || a.symbol;
+      btn.dataset.symbol = a.symbol;
+      btn.title = a.symbol;
+      btn.addEventListener("click", () => {
+        const s = btn.dataset.symbol;
+        if (rel.selected.has(s)) { rel.selected.delete(s); btn.classList.remove("on"); }
+        else { rel.selected.add(s); btn.classList.add("on"); }
+        updateRelPerfChart().catch(console.error);
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  async function ensureSeries(symbol, path) {
+    let s = state.cache.get(symbol);
+    if (!s) {
+      const res = await fetch(path, { cache: "no-store" });
+      const raw = await res.json();
+      s = normalizeSeries(raw);
+      state.cache.set(symbol, s);
+    }
+    return s;
+  }
+
+  async function updateRelPerfChart() {
+    const canvas = document.getElementById("relperf-chart");
+    if (!canvas || !state.assetsIndex) return;
+
+    const baselineTs = makeBaselineStartTs(state.range, new Date());
+
+    // build datasets using {x,y} points so datasets can have different timestamps
+    const datasets = [];
+    for (const a of state.assetsIndex.assets) {
+      if (!rel.selected.has(a.symbol)) continue;
+      const series = await ensureSeries(a.symbol, a.path);
+      if (!series.length) continue;
+
+      const startPx = baselinePriceOnOrAfter(series, baselineTs);
+      if (startPx == null || startPx <= 0) continue;
+
+      const rows = series.filter(pt => pt.t.getTime() >= baselineTs);
+      const points = rows.map(pt => ({ x: pt.t, y: ((pt.p / startPx) - 1) * 100 }));
+
+      datasets.push({
+        label: a.name || a.symbol,
+        data: points,
+        borderColor: colorFor(a.symbol),
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.2,
+      });
+    }
+
+    // create/update chart
+    const ctx = canvas.getContext("2d");
+    if (!rel.chart) {
+      rel.chart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: "nearest", intersect: false },
+          plugins: {
+            legend: { position: "top" },
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  const v = c.parsed.y;
+                  return `${c.dataset.label}: ${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { type: "time", time: { unit: state.range === "24H" ? "hour" : "day" } },
+            y: {
+              ticks: { callback: v => `${v.toFixed(0)}%` },
+              grid: { color: (ctx) => ctx.tick.value === 0 ? "#999" : "rgba(0,0,0,.06)" }
+            }
+          }
+        }
+      });
+    } else {
+      rel.chart.data.datasets = datasets;
+      rel.chart.options.scales.x.time.unit = (state.range === "24H" ? "hour" : "day");
+      rel.chart.update();
+    }
+  }
+
+  // ---- table rendering (unchanged logic) ----
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -467,7 +561,12 @@ window.__charts = {};
 
       const latest = series.at(-1);
       const pct = computePctChange(series, state.range, now);
-      rows.push({ symbol: a.symbol, name: a.name ?? a.symbol, price: latest.p, changePct: pct });
+      rows.push({
+        symbol: a.symbol,
+        name: a.name ?? a.symbol,
+        price: latest.p,
+        changePct: pct
+      });
     }
 
     rows.sort((a, b) => (b.changePct ?? -Infinity) - (a.changePct ?? -Infinity));
@@ -475,7 +574,10 @@ window.__charts = {};
     tbody.innerHTML = "";
     for (const r of rows) {
       const up = (r.changePct ?? 0) >= 0;
-      const pctTxt = (r.changePct == null || Number.isNaN(r.changePct)) ? "—" : (r.changePct >= 0 ? "+" : "") + r.changePct.toFixed(2) + "%";
+      const pctTxt = (r.changePct == null || Number.isNaN(r.changePct))
+        ? "—"
+        : (r.changePct >= 0 ? "+" : "") + r.changePct.toFixed(2) + "%";
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td style="text-align:left;"><strong>${r.name}</strong></td>
@@ -489,6 +591,31 @@ window.__charts = {};
     }
   }
 
+  // ---- init & wiring ----
+  async function init() {
+    // load index
+    const idxRes = await fetch("data/assets.json", { cache: "no-store" });
+    state.assetsIndex = await idxRes.json();
+
+    // delegated click handler for ALL performance range buttons on the pane
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest('#pane-performance .rng[data-range]');
+      if (!btn) return;
+      // set active in its local group
+      const group = btn.closest(".range-switch") || document;
+      group.querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
+      state.range = btn.dataset.range;
+      renderTable();
+      updateRelPerfChart();
+    });
+
+    // picker + first render
+    buildPicker();
+    await renderTable();
+    await updateRelPerfChart();
+  }
+
+  // bootstrapping
   document.addEventListener("DOMContentLoaded", () => {
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
@@ -499,7 +626,9 @@ window.__charts = {};
         }
       });
     }
-    if ((location.hash || "").toLowerCase() === "#performance" || document.getElementById("pane-performance")?.classList.contains("active")) {
+    // If we land directly on #performance or the pane is active, initialize.
+    if ((location.hash || "").toLowerCase() === "#performance" ||
+        document.getElementById("pane-performance")?.classList.contains("active")) {
       if (!state.initialized) {
         state.initialized = true;
         init().catch(e => console.error("Performance init error:", e));
@@ -507,6 +636,7 @@ window.__charts = {};
     }
   });
 })();
+
 
 
 
