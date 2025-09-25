@@ -123,13 +123,30 @@
     #perf-table td:nth-child(2), #perf-table td:nth-child(3) { text-align:right; }
     #perf-table tbody tr { cursor:pointer; }
 
-    /* NEW: relative performance picker + chart */
+    /* NEW: relative performance picker + framed chart */
     .relperf{ margin-top:8px; }
     .asset-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px;max-height:112px;overflow:auto;}
     .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
     .asset-btn.on{background:#111;color:#fff;border-color:#111;}
     .tz-note{ text-align:right; color:#666; font-size:12px; margin:0 4px 6px; }
-    #relperf-chart{height:380px;max-width:100%;background:#fff;}
+
+    /* Fixed-size frame that prevents the canvas from stretching the page */
+    .relperf-frame{
+      position:relative;
+      width:100%;
+      height:360px;             /* <- adjust once if you want a different height */
+      margin:8px 0 16px;
+      background:#fff;
+      border:1px solid #eee;
+      border-radius:8px;
+    }
+    .relperf-frame canvas{
+      position:absolute;
+      inset:0;
+      width:100% !important;
+      height:100% !important;
+      display:block;
+    }
   </style>
 </head>
 <body>
@@ -200,7 +217,7 @@
       <div class="chart-row">
         <div>
           <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
-        <div class="toolbar" data-for="chart-bbmcap">
+          <div class="toolbar" data-for="chart-bbmcap">
             <button class="on" data-range="ALL">All</button>
             <button data-range="3M">3M</button>
             <button data-range="1M">1M</button>
@@ -243,11 +260,13 @@
         </div>
       </div>
 
-      <!-- NEW: Relative performance block -->
+      <!-- Relative performance (fixed-size frame) -->
       <div class="relperf">
         <div id="relperf-picker" class="asset-picker"></div>
         <div class="tz-note">Times shown in Eastern Time (ET)</div>
-        <canvas id="relperf-chart"></canvas>
+        <div class="relperf-frame">
+          <canvas id="relperf-chart"></canvas>
+        </div>
       </div>
 
       <div class="table-wrap">
