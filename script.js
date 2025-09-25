@@ -115,7 +115,8 @@ async function makeDualAxis({
             borderColor: leftColor,
             backgroundColor: rgba(leftColor, 0.12),
             borderWidth: 2,
-            fill: false
+            fill: false,
+            spanGaps: true
           },
           {
             label: rightLabel,
@@ -126,16 +127,21 @@ async function makeDualAxis({
             borderColor: rightColor,
             backgroundColor: rgba(rightColor, 0.12),
             borderWidth: 2,
-            fill: false
+            fill: false,
+            spanGaps: true
           }
         ]
       },
       options: {
         responsive: true,
-        interaction: { mode: "index", intersect: false },
+        interaction: { mode: "index", intersect: false }, // shared hover
         plugins: {
           legend: { position: "top" },
           tooltip: {
+            mode: "index",
+            intersect: false,
+            filter: (item) => Number.isFinite(item.parsed?.y),
+            itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
             callbacks: {
               title: (items) => {
                 const raw = items[0].label || items[0].parsed?.x;
@@ -145,7 +151,7 @@ async function makeDualAxis({
               label: c => {
                 const label = c.dataset.label || "";
                 const v = c.parsed.y;
-                if (/price/i.test(label)) {
+                if (/price/i.test(label) || c.dataset.yAxisID === "yR") {
                   return `${label}: $${(v ?? 0).toLocaleString(undefined,{ maximumFractionDigits: 6 })}`;
                 }
                 return `${label}: $${(v ?? 0).toLocaleString()}`;
@@ -199,11 +205,6 @@ async function makeDualAxis({
 }
 
 /* ========== Cumulative Buybacks vs Circulating Market Cap ========== */
-function fmtPctAxis(v) {
-  if (!isFinite(v)) return "";
-  return `${(v * 100).toFixed(1)}%`;
-}
-
 async function makeBuybacksVsMcap({ el, file, statsId }) {
   try {
     const res = await fetch(file, { cache: "no-store" });
@@ -220,6 +221,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       return bb / mc;
     };
 
+    // stats box
     (function renderStats() {
       const target = document.getElementById(statsId);
       if (!target || !series.length) return;
@@ -280,17 +282,21 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       data: {
         labels,
         datasets: [
-          { label: "Market Cap (USD)", data: mcapUSD, yAxisID: "yUSD", tension: .25, pointRadius: 0, borderColor: "#000000", backgroundColor: rgba("#000000", 0.12), borderWidth: 2, fill: false },
-          { label: "Cum. Buybacks (USD)", data: buyUSD, yAxisID: "yUSD", tension: .25, pointRadius: 0, borderColor: "#54d794", backgroundColor: rgba("#54d794", 0.12), borderWidth: 2, fill: false },
-          { label: "Share bought (% MC)", data: pct, yAxisID: "yPct", tension: .25, pointRadius: 0, borderColor: "#777", borderDash: [6,4], backgroundColor: "transparent", borderWidth: 2, fill: false }
+          { label: "Market Cap (USD)",  data: mcapUSD, yAxisID: "yUSD", tension:.25, pointRadius:0, borderColor:"#000000", backgroundColor:rgba("#000000",0.12), borderWidth:2, fill:false, spanGaps:true },
+          { label: "Cum. Buybacks (USD)", data: buyUSD, yAxisID: "yUSD", tension:.25, pointRadius:0, borderColor:"#54d794", backgroundColor:rgba("#54d794",0.12), borderWidth:2, fill:false, spanGaps:true },
+          { label: "Share bought (% MC)", data: pct, yAxisID: "yPct", tension:.25, pointRadius:0, borderColor:"#777", borderDash:[6,4], backgroundColor:"transparent", borderWidth:2, fill:false, spanGaps:true }
         ]
       },
       options: {
         responsive: true,
-        interaction: { mode: "index", intersect: false },
+        interaction: { mode: "index", intersect: false }, // shared hover
         plugins: {
           legend: { position: "top" },
           tooltip: {
+            mode: "index",
+            intersect: false,
+            filter: (item) => Number.isFinite(item.parsed?.y),
+            itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
             callbacks: {
               title: (items) => {
                 const raw = items[0].label || items[0].parsed?.x;
@@ -320,12 +326,13 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
               }
             }
           },
-          yUSD: { position: "left", ticks: { callback: v => `$${Number(v).toLocaleString()}` } },
+          yUSD: { position: "left",  ticks: { callback: v => `$${Number(v).toLocaleString()}` } },
           yPct: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => `${(v*100).toFixed(1)}%` } }
         }
       }
     });
 
+    // Range buttons
     const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
     if (toolbar) {
       toolbar.addEventListener("click", (e) => {
@@ -351,6 +358,8 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
     return null;
   }
 }
+
+
 
 /* ========= build charts ========= */
 window.__charts = {};
