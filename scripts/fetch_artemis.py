@@ -203,16 +203,20 @@ print("wrote data/pump_price_buybacks_usd.json rows:", len(df_pbb))
 
 
 # ---------- 4) PUMP: Cumulative Buybacks (USD) vs Market Cap ----------
-resp_bb = API.fetch_metrics(
-    metric_names="buybacks",
-    symbols=ASSET,
-    start_date=START,
-    end_date=END,
-)
-sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
-df_bb = to_df_vals(sym_bb.get("buybacks", []), "buybacks_usd")
+# Buybacks in USD (daily) → cumulative
+try:
+    resp_bb = API.fetch_metrics(
+        metric_names="buybacks",
+        symbols=ASSET,
+        start_date=START,
+        end_date=END,
+    )
+    sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
+    df_bb = to_df_vals(sym_bb.get("buybacks", []), "buybacks_usd")
+except Exception:
+    # Fallback: derive from step (3) if API path above not available
+    df_bb = df_pbb.loc[:, ["date", "buybacks_usd"]].copy()
 
-# Cumulative buybacks directly
 df_bb["cum_buybacks_usd"] = df_bb["buybacks_usd"].fillna(0).cumsum()
 
 # --- Market Cap fetch ---
@@ -243,7 +247,12 @@ for names in [
     except Exception:
         continue
 
-df_core = df_bb.copy()
+# Base frame: ensure price is available for supply→mcap path
+df_core = (
+    df_bb
+    .merge(df_price.rename(columns={"price": "price"}), on="date", how="outer")
+    .sort_values("date").reset_index(drop=True)
+)
 
 if sym_mc and used_key in mcap_candidates:
     df_mcap = to_df_vals(sym_mc.get(used_key, []), "mcap_usd")
@@ -251,13 +260,14 @@ if sym_mc and used_key in mcap_candidates:
 elif sym_mc and used_key in supply_candidates:
     df_sup = to_df_vals(sym_mc.get(used_key, []), "circ_supply")
     df_core = pd.merge(df_core, df_sup, on="date", how="outer").sort_values("date").reset_index(drop=True)
-    df_core["mcap_usd"] = df_core["price"] * df_core["circ_supply"]
+    df_core["mcap_usd"] = pd.to_numeric(df_core.get("price"), errors="coerce") * pd.to_numeric(df_core.get("circ_supply"), errors="coerce")
 else:
     print("WARN: Could not find market cap metric. Only buybacks will be available.")
 
-# % supply retired (proxy)
+# % of market cap value spent on buybacks (proxy for share retired)
 if "mcap_usd" in df_core:
-    df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
+    with pd.option_context('mode.use_inf_as_na', True):
+        df_core["pct_bought"] = (df_core["cum_buybacks_usd"] / df_core["mcap_usd"]).replace([float("inf"), -float("inf")], pd.NA)
 
 # Write file
 out_file = "data/pump_mcap_buybacks.json"
@@ -268,8 +278,8 @@ with open(out_file, "w") as f:
             {
                 "date": d.strftime("%Y-%m-%d"),
                 "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
-                "mcap_usd":         None if pd.isna(mc) else float(mc),
-                "pct_bought":       None if pd.isna(pb) else float(pb),
+                "mcap_usd":         None if ("mcap_usd" not in df_core or pd.isna(mc)) else float(mc),
+                "pct_bought":       None if ("pct_bought" not in df_core or pd.isna(pb)) else float(pb),
             }
             for d, cb, mc, pb in zip(
                 df_core["date"],

@@ -224,3 +224,4 @@ window.__charts = {};
   // When it’s ready, we can plug it back in here.
 })();
 
+})();
