@@ -48,14 +48,7 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const R_w   = latestOnOrBefore(rows, rightKey, d7);
   const R_m   = latestOnOrBefore(rows, rightKey, d30);
 
-  // Pretty titles for common keys
-  const map = {
-    price: "Price",
-    fees: "Fees",
-    revenue: "Revenue",
-    buybacks: "Buybacks",
-    buybacks_usd: "Buybacks (USD)"
-  };
+  const map = { price:"Price", fees:"Fees", revenue:"Revenue", buybacks:"Buybacks" };
 
   el.innerHTML = `
     <div class="stat-card">
@@ -89,7 +82,7 @@ async function makeDualAxis({
   statsId
 }) {
   try {
-    const res = await fetch(`${file}?cb=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(file, { cache: "no-store" });
     if (!res.ok) throw new Error(`${file} fetch failed`);
     const { series } = await res.json();
     if (!Array.isArray(series)) throw new Error(`${file} bad shape`);
@@ -195,12 +188,12 @@ function fmtPctAxis(v) {
 
 async function makeBuybacksVsMcap({ el, file, statsId }) {
   try {
-    const res = await fetch(`${file}?cb=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(file, { cache: "no-store" });
     if (!res.ok) throw new Error(`${file} fetch failed`);
     const { series } = await res.json();
     if (!Array.isArray(series)) throw new Error(`${file} bad shape`);
 
-    // Stats: percent of market cap bought + components
+    // Stats: share retired + components
     (function renderStats() {
       const target = document.getElementById(statsId);
       if (!target || !series.length) return;
@@ -210,20 +203,9 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       const d7 = new Date(last);  d7.setDate(d7.getDate()-7);
       const d30 = new Date(last); d30.setDate(d30.getDate()-30);
 
-      // Prefer server-provided pct_mcap_bought; compute if missing
-      const pct_at = (dt) => {
-        const r = rows.findLast(x => new Date(x.date) <= dt) || rows[rows.length-1];
-        if (!r) return NaN;
-        if (typeof r.pct_mcap_bought === "number") return r.pct_mcap_bought;
-        if (r.cum_buybacks_usd != null && r.mcap_usd != null && r.mcap_usd !== 0) {
-          return r.cum_buybacks_usd / r.mcap_usd;
-        }
-        return NaN;
-      };
-
-      const pct_now = pct_at(last);
-      const pct_w   = pct_at(d7);
-      const pct_m   = pct_at(d30);
+      const pct_now = latestOnOrBefore(rows,"pct_bought", last);
+      const pct_w   = latestOnOrBefore(rows,"pct_bought", d7);
+      const pct_m   = latestOnOrBefore(rows,"pct_bought", d30);
 
       const b_now = latestOnOrBefore(rows,"cum_buybacks_usd", last);
       const b_w   = latestOnOrBefore(rows,"cum_buybacks_usd", d7);
@@ -235,7 +217,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
 
       target.innerHTML = `
         <div class="stat-card">
-          <div class="stat-title">Share bought (% of mkt cap)</div>
+          <div class="stat-title">Share retired</div>
           <div class="stat-row"><span>Now</span><strong>${isFinite(pct_now)?(pct_now*100).toFixed(2)+'%':'—'}</strong></div>
           <div class="stat-row"><span>1M Δ</span><strong class="${pctChange(pct_now,pct_m)>=0?'pos':'neg'}">${formatPct(pctChange(pct_now,pct_m))}</strong></div>
           <div class="stat-row"><span>1W Δ</span><strong class="${pctChange(pct_now,pct_w)>=0?'pos':'neg'}">${formatPct(pctChange(pct_now,pct_w))}</strong></div>
@@ -258,11 +240,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
     const labels = series.map(d => d.date);
     const buyUSD = series.map(d => d.cum_buybacks_usd);
     const mcapUSD= series.map(d => d.mcap_usd);
-    const pct    = series.map(d =>
-      (typeof d.pct_mcap_bought === "number")
-        ? d.pct_mcap_bought
-        : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
-    );
+    const pct    = series.map(d => d.pct_bought);
 
     const ctx = document.getElementById(el)?.getContext("2d");
     if (!ctx) return null;
@@ -294,8 +272,8 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
             borderWidth: 2,
             fill: false
           },
-          { // % axis (right): percent of market cap bought
-            label: "Share bought (% MC)",
+          { // % axis (right): share retired
+            label: "Share retired (%)",
             data: pct,
             yAxisID: "yPct",
             tension: .25,
@@ -353,11 +331,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
         chart.data.labels = subset.map(d => d.date);
         chart.data.datasets[0].data = subset.map(d => d.mcap_usd);
         chart.data.datasets[1].data = subset.map(d => d.cum_buybacks_usd);
-        chart.data.datasets[2].data = subset.map(d =>
-          (typeof d.pct_mcap_bought === "number")
-            ? d.pct_mcap_bought
-            : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
-        );
+        chart.data.datasets[2].data = subset.map(d => d.pct_bought);
         chart.update();
       });
     }
@@ -382,8 +356,36 @@ window.__charts = {};
     leftLabel: "Fees",
     rightLabel: "Price (USD)",
     statsId: "stats-chart"
-  }
+  });
 
+  // 2) Price vs Revenue
+  window.__charts.priceRevenue = await makeDualAxis({
+    el: "chart-revenue",
+    file: "data/pump_price_revenue.json",
+    leftKey: "revenue",
+    rightKey: "price",
+    leftLabel: "Revenue",
+    rightLabel: "Price (USD)",
+    statsId: "stats-chart-rev"
+  });
 
+  // 3) Price vs Buybacks (USD) — keep original file/shape
+window.__charts.priceBuybacks = await makeDualAxis({
+  el: "chart-buybacks",
+  file: "data/pump_price_buybacks_usd.json", // <-- back to original
+  leftKey: "buybacks_usd",                   // <-- back to original
+  rightKey: "price",
+  leftLabel: "Buybacks (USD)",
+  rightLabel: "Price (USD)",
+  statsId: "stats-chart-bb"
+});
+
+  // 4) Cumulative Buybacks vs Circulating Market Cap
+  window.__charts.bbmcap = await makeBuybacksVsMcap({
+    el: "chart-bbmcap",
+    file: "data/pump_buybacks_vs_mcap.json", // expects { date, cum_buybacks_usd, mcap_usd, pct_bought }
+    statsId: "stats-chart-bbmcap"
+  });
+})();
 
 
