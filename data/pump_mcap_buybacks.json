@@ -1,0 +1,430 @@
+{
+  "series": [
+    {
+      "date": "2025-07-16",
+      "cum_buybacks_usd": 3646264.594335,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-17",
+      "cum_buybacks_usd": 3827688.823627,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-18",
+      "cum_buybacks_usd": 3995920.60142,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-19",
+      "cum_buybacks_usd": 3995920.60142,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-20",
+      "cum_buybacks_usd": 4120061.15914,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-21",
+      "cum_buybacks_usd": 4120061.15914,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-22",
+      "cum_buybacks_usd": 4394518.618677,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-23",
+      "cum_buybacks_usd": 4536666.528371,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-24",
+      "cum_buybacks_usd": 4647289.359837,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-25",
+      "cum_buybacks_usd": 4748641.169497,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-26",
+      "cum_buybacks_usd": 4832686.432065,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-27",
+      "cum_buybacks_usd": 4890677.906565,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-28",
+      "cum_buybacks_usd": 5114952.825689,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-29",
+      "cum_buybacks_usd": 5631427.312057,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-30",
+      "cum_buybacks_usd": 5948732.846609,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-07-31",
+      "cum_buybacks_usd": 6129965.146949,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-01",
+      "cum_buybacks_usd": 6367347.859074,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-02",
+      "cum_buybacks_usd": 6567957.047595,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-03",
+      "cum_buybacks_usd": 6894892.355597,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-04",
+      "cum_buybacks_usd": 7109262.099523,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-05",
+      "cum_buybacks_usd": 7430176.730418,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-06",
+      "cum_buybacks_usd": 8259348.049123,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-07",
+      "cum_buybacks_usd": 10000111.841725,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-08",
+      "cum_buybacks_usd": 11448344.254953,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-09",
+      "cum_buybacks_usd": 11448344.254953,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-10",
+      "cum_buybacks_usd": 14219724.826482,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-11",
+      "cum_buybacks_usd": 15681446.037278,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-12",
+      "cum_buybacks_usd": 17896613.703148,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-13",
+      "cum_buybacks_usd": 19952432.358705,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-14",
+      "cum_buybacks_usd": 22354720.439086,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-15",
+      "cum_buybacks_usd": 24200084.807356,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-16",
+      "cum_buybacks_usd": 25865793.640778,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-17",
+      "cum_buybacks_usd": 27492867.141786,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-18",
+      "cum_buybacks_usd": 28896058.601455,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-19",
+      "cum_buybacks_usd": 30674490.027985,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-20",
+      "cum_buybacks_usd": 32111888.681934,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-21",
+      "cum_buybacks_usd": 33601759.936851,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-22",
+      "cum_buybacks_usd": 34825707.799647,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-23",
+      "cum_buybacks_usd": 36929024.352816,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-24",
+      "cum_buybacks_usd": 38413502.726539,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-25",
+      "cum_buybacks_usd": 39665770.793317,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-26",
+      "cum_buybacks_usd": 41365488.51247,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-27",
+      "cum_buybacks_usd": 43371087.753712,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-28",
+      "cum_buybacks_usd": 46012671.804318,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-29",
+      "cum_buybacks_usd": 48228276.44101,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-30",
+      "cum_buybacks_usd": 49846905.097912,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-08-31",
+      "cum_buybacks_usd": 51164313.562186,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-01",
+      "cum_buybacks_usd": 52474325.70657,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-02",
+      "cum_buybacks_usd": 54039926.597544,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-03",
+      "cum_buybacks_usd": 55998721.278012,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-04",
+      "cum_buybacks_usd": 58426444.833854,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-05",
+      "cum_buybacks_usd": 60551231.373341,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-06",
+      "cum_buybacks_usd": 62420881.459276,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-07",
+      "cum_buybacks_usd": 64048274.723333,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-08",
+      "cum_buybacks_usd": 65301776.693899,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-09",
+      "cum_buybacks_usd": 67871852.353973,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-10",
+      "cum_buybacks_usd": 70092489.652792,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-11",
+      "cum_buybacks_usd": 72845987.213824,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-12",
+      "cum_buybacks_usd": 75165511.975706,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-13",
+      "cum_buybacks_usd": 77775995.400274,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-14",
+      "cum_buybacks_usd": 79810518.34893,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-15",
+      "cum_buybacks_usd": 82984626.437304,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-16",
+      "cum_buybacks_usd": 86157885.746037,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-17",
+      "cum_buybacks_usd": 89160729.79408,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-18",
+      "cum_buybacks_usd": 91407419.88899,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-19",
+      "cum_buybacks_usd": 93157518.03683,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-20",
+      "cum_buybacks_usd": 95099758.937046,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-21",
+      "cum_buybacks_usd": 96428745.512969,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-22",
+      "cum_buybacks_usd": 97585724.754123,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-23",
+      "cum_buybacks_usd": 98924181.981903,
+      "mcap_usd": null,
+      "pct_bought": null
+    },
+    {
+      "date": "2025-09-24",
+      "cum_buybacks_usd": 100236001.839198,
+      "mcap_usd": null,
+      "pct_bought": null
+    }
+  ]
+}
