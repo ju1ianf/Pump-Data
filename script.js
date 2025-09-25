@@ -8,6 +8,11 @@ function rgba(hex, a = 0.15) {
 const PRICE_COLOR = "#54d794";     // green
 const RIGHT_COLOR = "#000000";     // black
 
+// --- ET (Eastern Time) formatting helpers ---
+const ET_TZ = "America/New_York";
+const fmtET = (date, opts = {}) =>
+  new Intl.DateTimeFormat(undefined, { timeZone: ET_TZ, ...opts }).format(date);
+
 function latestOnOrBefore(rows, key, cutoff) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const d = new Date(rows[i].date);
@@ -132,6 +137,11 @@ async function makeDualAxis({
           legend: { position: "top" },
           tooltip: {
             callbacks: {
+              title: (items) => {
+                const raw = items[0].label || items[0].parsed?.x;
+                const d = typeof raw === "number" ? new Date(raw) : new Date(raw);
+                return fmtET(d, { year:"numeric", month:"short", day:"numeric" });
+              },
               label: c => {
                 const label = c.dataset.label || "";
                 const v = c.parsed.y;
@@ -141,19 +151,27 @@ async function makeDualAxis({
                 return `${label}: $${(v ?? 0).toLocaleString()}`;
               }
             }
+          },
+          subtitle: {
+            display: true,
+            text: "Times shown in Eastern Time (ET)",
+            align: "end",
+            padding: { top: 6 }
           }
         },
         scales: {
-          x: { type: "time", time: { unit: "day" } },
-          yL: {
-            position: "left",
-            ticks: { callback: v => `$${Number(v).toLocaleString()}` }
+          x: {
+            type: "time",
+            time: { unit: "day" },
+            ticks: {
+              callback: (value) => {
+                const d = new Date(+value);
+                return fmtET(d, { month:"short", day:"numeric" });
+              }
+            }
           },
-          yR: {
-            position: "right",
-            grid: { drawOnChartArea: false },
-            ticks: { callback: v => `$${Number(v).toFixed(3)}` }
-          }
+          yL: { position: "left", ticks: { callback: v => `$${Number(v).toLocaleString()}` } },
+          yR: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => `$${Number(v).toFixed(3)}` } }
         }
       }
     });
@@ -270,10 +288,38 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       options: {
         responsive: true,
         interaction: { mode: "index", intersect: false },
-        plugins: { legend: { position: "top" },
-          tooltip: { callbacks: { label: c => (c.dataset.yAxisID === "yPct") ? `${c.dataset.label}: ${(c.parsed.y*100).toFixed(2)}%` : `${c.dataset.label}: $${Number(c.parsed.y).toLocaleString()}` } } },
+        plugins: {
+          legend: { position: "top" },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const raw = items[0].label || items[0].parsed?.x;
+                const d = typeof raw === "number" ? new Date(raw) : new Date(raw);
+                return fmtET(d, { year:"numeric", month:"short", day:"numeric" });
+              },
+              label: c => (c.dataset.yAxisID === "yPct")
+                ? `${c.dataset.label}: ${(c.parsed.y*100).toFixed(2)}%`
+                : `${c.dataset.label}: $${Number(c.parsed.y).toLocaleString()}`
+            }
+          },
+          subtitle: {
+            display: true,
+            text: "Times shown in Eastern Time (ET)",
+            align: "end",
+            padding: { top: 6 }
+          }
+        },
         scales: {
-          x: { type: "time", time: { unit: "day" } },
+          x: {
+            type: "time",
+            time: { unit: "day" },
+            ticks: {
+              callback: (value) => {
+                const d = new Date(+value);
+                return fmtET(d, { month:"short", day:"numeric" });
+              }
+            }
+          },
           yUSD: { position: "left", ticks: { callback: v => `$${Number(v).toLocaleString()}` } },
           yPct: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => `${(v*100).toFixed(1)}%` } }
         }
@@ -339,14 +385,14 @@ window.__charts = {};
 })();
 
 // ============ Performance Tab (table + relative chart) ============
-
 (() => {
-  const MS_DAY = 24 * 60 * 60 * 1000;
+  const MS_HOUR = 60 * 60 * 1000;
+  const MS_DAY = 24 * MS_HOUR;
 
   const state = {
     range: "YTD",          // default
     assetsIndex: null,
-    cache: new Map(),      // symbol -> [{t: Date, p: number}]
+    cache: new Map(),      // cache key -> [{t: Date, p: number}]
     initialized: false,
   };
 
@@ -358,11 +404,11 @@ window.__charts = {};
   function makeBaselineStartTs(range, nowUTC = new Date()) {
     const now = nowUTC;
     switch (range) {
-      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();   // yesterday 00:00Z
-      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();   // 7 days ago 00:00Z
-      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();  // 30 days ago 00:00Z
-      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();  // 90 days ago 00:00Z
-      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                             // Jan 1 00:00Z
+      case "24H": return now.getTime() - 24 * MS_HOUR;                                  // rolling 24 hours
+      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime(); // 7 days ago 00:00Z
+      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
+      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();
+      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                           // Jan 1 00:00Z
       default:    return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
     }
   }
@@ -458,15 +504,42 @@ window.__charts = {};
     });
   }
 
-  async function ensureSeries(symbol, path) {
-    let s = state.cache.get(symbol);
+  async function fetchJSON(path) {
+    const res = await fetch(path, { cache: "no-store" });
+    if (!res.ok) throw new Error(`${path} ${res.status}`);
+    return res.json();
+  }
+
+  // pick hourly file for 24H if available (either assets.json has path1h, or infer *_1h.json)
+  function hourlyPathOf(a) {
+    if (a.path1h) return a.path1h;
+    if (typeof a.path === "string" && a.path.endsWith(".json")) {
+      return a.path.replace(/\.json$/i, "_1h.json");
+    }
+    return `${a.path}_1h.json`;
+  }
+
+  async function ensureSeries(cacheKey, path) {
+    let s = state.cache.get(cacheKey);
     if (!s) {
-      const res = await fetch(path, { cache: "no-store" });
-      const raw = await res.json();
+      const raw = await fetchJSON(path);
       s = normalizeSeries(raw);
-      state.cache.set(symbol, s);
+      state.cache.set(cacheKey, s);
     }
     return s;
+  }
+
+  async function ensureSeriesForRange(a) {
+    if (state.range === "24H") {
+      // try hourly, fall back to daily
+      const key = `${a.symbol}:1h`;
+      try {
+        return await ensureSeries(key, hourlyPathOf(a));
+      } catch {
+        return await ensureSeries(a.symbol, a.path);
+      }
+    }
+    return await ensureSeries(a.symbol, a.path);
   }
 
   async function updateRelPerfChart() {
@@ -475,11 +548,16 @@ window.__charts = {};
 
     const baselineTs = makeBaselineStartTs(state.range, new Date());
 
-    // build datasets using {x,y} points so datasets can have different timestamps
     const datasets = [];
     for (const a of state.assetsIndex.assets) {
       if (!rel.selected.has(a.symbol)) continue;
-      const series = await ensureSeries(a.symbol, a.path);
+      let series;
+      try {
+        series = await ensureSeriesForRange(a);
+      } catch (e) {
+        console.error("series load failed:", a.symbol, e);
+        continue;
+      }
       if (!series.length) continue;
 
       const startPx = baselinePriceOnOrAfter(series, baselineTs);
@@ -500,15 +578,16 @@ window.__charts = {};
       });
     }
 
-    // create/update chart
     const ctx = canvas.getContext("2d");
+    const timeUnit = (state.range === "24H" ? "hour" : "day");
+
     if (!rel.chart) {
       rel.chart = new Chart(ctx, {
         type: "line",
         data: { datasets },
         options: {
           responsive: true,
-          // <<< SHOW ALL SERIES AT HOVERED X >>>
+          // SHOW ALL SERIES AT HOVERED X
           interaction: { mode: "index", intersect: false, axis: "x" },
           hover: { mode: "index", intersect: false },
           plugins: {
@@ -517,11 +596,12 @@ window.__charts = {};
               itemSort: (a, b) => (b.parsed?.y ?? 0) - (a.parsed?.y ?? 0),
               callbacks: {
                 title: (items) => {
-                  const d = new Date(items[0].parsed.x || items[0].label);
-                  return d.toLocaleString(undefined, {
+                  const raw = items[0].parsed?.x ?? items[0].raw?.x ?? items[0].label;
+                  const d = raw instanceof Date ? raw : new Date(raw);
+                  return fmtET(d, {
                     year: "numeric", month: "short", day: "numeric",
-                    hour: "2-digit", minute: "2-digit"
-                  });
+                    hour: "numeric", minute: "2-digit"
+                  }) + " ET";
                 },
                 label: (c) => {
                   const v = c.parsed.y;
@@ -529,10 +609,26 @@ window.__charts = {};
                   return `${c.dataset.label}: ${sign}${(v ?? 0).toFixed(2)}%`;
                 }
               }
+            },
+            subtitle: {
+              display: true,
+              text: "Times shown in Eastern Time (ET)",
+              align: "end",
+              padding: { top: 6 }
             }
           },
           scales: {
-            x: { type: "time", time: { unit: state.range === "24H" ? "hour" : "day" } },
+            x: {
+              type: "time",
+              time: { unit: timeUnit },
+              ticks: {
+                callback: (value) => {
+                  const d = new Date(+value);
+                  if (timeUnit === "hour") return fmtET(d, { hour: "numeric" });
+                  return fmtET(d, { month: "short", day: "numeric" });
+                }
+              }
+            },
             y: {
               ticks: { callback: v => `${v.toFixed(0)}%` },
               grid: { color: (ctx) => ctx.tick.value === 0 ? "#999" : "rgba(0,0,0,.06)" }
@@ -542,7 +638,7 @@ window.__charts = {};
       });
     } else {
       rel.chart.data.datasets = datasets;
-      rel.chart.options.scales.x.time.unit = (state.range === "24H" ? "hour" : "day");
+      rel.chart.options.scales.x.time.unit = timeUnit;
       rel.chart.update();
     }
   }
@@ -557,17 +653,12 @@ window.__charts = {};
     const now = new Date();
 
     for (const a of state.assetsIndex.assets) {
-      let series = state.cache.get(a.symbol);
-      if (!series) {
-        try {
-          const res = await fetch(a.path, { cache: "no-store" });
-          const raw = await res.json();
-          series = normalizeSeries(raw);
-          state.cache.set(a.symbol, series);
-        } catch (e) {
-          console.error("Performance load failed:", a.symbol, e);
-          continue;
-        }
+      let series;
+      try {
+        series = await ensureSeriesForRange(a);
+      } catch (e) {
+        console.error("Performance load failed:", a.symbol, e);
+        continue;
       }
       if (!series.length) continue;
 
@@ -605,7 +696,6 @@ window.__charts = {};
 
   // ---- init & wiring ----
   async function init() {
-    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
@@ -613,7 +703,6 @@ window.__charts = {};
     document.addEventListener("click", (e) => {
       const btn = e.target.closest('#pane-performance .rng[data-range]');
       if (!btn) return;
-      // set active in its local group
       const group = btn.closest(".range-switch") || document;
       group.querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
       state.range = btn.dataset.range;
@@ -621,7 +710,6 @@ window.__charts = {};
       updateRelPerfChart();
     });
 
-    // picker + first render
     buildPicker();
     await renderTable();
     await updateRelPerfChart();
@@ -638,7 +726,6 @@ window.__charts = {};
         }
       });
     }
-    // If we land directly on #performance or the pane is active, initialize.
     if ((location.hash || "").toLowerCase() === "#performance" ||
         document.getElementById("pane-performance")?.classList.contains("active")) {
       if (!state.initialized) {
@@ -648,4 +735,5 @@ window.__charts = {};
     }
   });
 })();
+
 
