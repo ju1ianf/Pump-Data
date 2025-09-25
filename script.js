@@ -48,7 +48,6 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const R_w   = latestOnOrBefore(rows, rightKey, d7);
   const R_m   = latestOnOrBefore(rows, rightKey, d30);
 
-  // Pretty names for common keys (added buybacks_usd → “Buybacks (USD)”)
   const map = { price:"Price", fees:"Fees", revenue:"Revenue", buybacks:"Buybacks", buybacks_usd:"Buybacks (USD)" };
 
   el.innerHTML = `
@@ -103,7 +102,7 @@ async function makeDualAxis({
         labels,
         datasets: [
           {
-            label: leftLabel,       // left axis (black)
+            label: leftLabel,
             data: dataL,
             yAxisID: "yL",
             tension: .25,
@@ -114,7 +113,7 @@ async function makeDualAxis({
             fill: false
           },
           {
-            label: rightLabel,      // right axis (green) — PRICE
+            label: rightLabel,
             data: dataR,
             yAxisID: "yR",
             tension: .25,
@@ -146,11 +145,11 @@ async function makeDualAxis({
         },
         scales: {
           x: { type: "time", time: { unit: "day" } },
-          yL: { // left axis (Fees/Revenue/Buybacks) — dollars
+          yL: {
             position: "left",
             ticks: { callback: v => `$${Number(v).toLocaleString()}` }
           },
-          yR: { // right axis (Price) — dollars
+          yR: {
             position: "right",
             grid: { drawOnChartArea: false },
             ticks: { callback: v => `$${Number(v).toFixed(3)}` }
@@ -194,19 +193,15 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
     const { series } = await res.json();
     if (!Array.isArray(series)) throw new Error(`${file} bad shape`);
 
-    // Helper: get % of market cap bought at a given date
     const pctAt = (rows, when) => {
-      // prefer server-provided pct_mcap_bought at/ before 'when'
       const serverPct = latestOnOrBefore(rows, "pct_mcap_bought", when);
       if (isFinite(serverPct)) return serverPct;
-      // fallback compute: cum_buybacks_usd / mcap_usd
       const bb = latestOnOrBefore(rows, "cum_buybacks_usd", when);
       const mc = latestOnOrBefore(rows, "mcap_usd", when);
       if (!isFinite(bb) || !isFinite(mc) || mc === 0) return NaN;
       return bb / mc;
     };
 
-    // ---- Stats box ----
     (function renderStats() {
       const target = document.getElementById(statsId);
       if (!target || !series.length) return;
@@ -267,83 +262,30 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       data: {
         labels,
         datasets: [
-          { // USD axis (left): Market Cap (black)
-            label: "Market Cap (USD)",
-            data: mcapUSD,
-            yAxisID: "yUSD",
-            tension: .25,
-            pointRadius: 0,
-            borderColor: "#000000",
-            backgroundColor: rgba("#000000", 0.12),
-            borderWidth: 2,
-            fill: false
-          },
-          { // USD axis (left): Cum. Buybacks (green)
-            label: "Cum. Buybacks (USD)",
-            data: buyUSD,
-            yAxisID: "yUSD",
-            tension: .25,
-            pointRadius: 0,
-            borderColor: "#54d794",
-            backgroundColor: rgba("#54d794", 0.12),
-            borderWidth: 2,
-            fill: false
-          },
-          { // % axis (right): percent of market cap bought
-            label: "Share bought (% MC)",
-            data: pct,
-            yAxisID: "yPct",
-            tension: .25,
-            pointRadius: 0,
-            borderColor: "#777",
-            borderDash: [6,4],
-            backgroundColor: "transparent",
-            borderWidth: 2,
-            fill: false
-          }
+          { label: "Market Cap (USD)", data: mcapUSD, yAxisID: "yUSD", tension: .25, pointRadius: 0, borderColor: "#000000", backgroundColor: rgba("#000000", 0.12), borderWidth: 2, fill: false },
+          { label: "Cum. Buybacks (USD)", data: buyUSD, yAxisID: "yUSD", tension: .25, pointRadius: 0, borderColor: "#54d794", backgroundColor: rgba("#54d794", 0.12), borderWidth: 2, fill: false },
+          { label: "Share bought (% MC)", data: pct, yAxisID: "yPct", tension: .25, pointRadius: 0, borderColor: "#777", borderDash: [6,4], backgroundColor: "transparent", borderWidth: 2, fill: false }
         ]
       },
       options: {
         responsive: true,
         interaction: { mode: "index", intersect: false },
-        plugins: {
-          legend: { position: "top" },
-          tooltip: {
-            callbacks: {
-              label: c => {
-                const label = c.dataset.label || "";
-                const v = c.parsed.y;
-                if (c.dataset.yAxisID === "yPct") {
-                  return `${label}: ${(v*100).toFixed(2)}%`;
-                }
-                return `${label}: $${Number(v).toLocaleString()}`;
-              }
-            }
-          }
-        },
+        plugins: { legend: { position: "top" },
+          tooltip: { callbacks: { label: c => (c.dataset.yAxisID === "yPct") ? `${c.dataset.label}: ${(c.parsed.y*100).toFixed(2)}%` : `${c.dataset.label}: $${Number(c.parsed.y).toLocaleString()}` } } },
         scales: {
           x: { type: "time", time: { unit: "day" } },
-          yUSD: {
-            position: "left",
-            ticks: { callback: v => `$${Number(v).toLocaleString()}` }
-          },
-          yPct: {
-            position: "right",
-            grid: { drawOnChartArea: false },
-            ticks: { callback: fmtPctAxis }
-          }
+          yUSD: { position: "left", ticks: { callback: v => `$${Number(v).toLocaleString()}` } },
+          yPct: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => `${(v*100).toFixed(1)}%` } }
         }
       }
     });
 
-    // Range buttons
     const toolbar = document.querySelector(`.toolbar[data-for="${el}"]`);
     if (toolbar) {
       toolbar.addEventListener("click", (e) => {
         const btn = e.target.closest("button[data-range]");
         if (!btn) return;
         toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
-
         const subset = filterByRange(series, btn.dataset.range);
         chart.data.labels = subset.map(d => d.date);
         chart.data.datasets[0].data = subset.map(d => d.mcap_usd);
@@ -368,60 +310,46 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
 window.__charts = {};
 
 (async () => {
-  // 1) Price vs Fees
   window.__charts.priceFees = await makeDualAxis({
-    el: "chart",
-    file: "data/pump.json",
-    leftKey: "fees",
-    rightKey: "price",
-    leftLabel: "Fees",
-    rightLabel: "Price (USD)",
+    el: "chart", file: "data/pump.json",
+    leftKey: "fees", rightKey: "price",
+    leftLabel: "Fees", rightLabel: "Price (USD)",
     statsId: "stats-chart"
   });
 
-  // 2) Price vs Revenue
   window.__charts.priceRevenue = await makeDualAxis({
-    el: "chart-revenue",
-    file: "data/pump_price_revenue.json",
-    leftKey: "revenue",
-    rightKey: "price",
-    leftLabel: "Revenue",
-    rightLabel: "Price (USD)",
+    el: "chart-revenue", file: "data/pump_price_revenue.json",
+    leftKey: "revenue", rightKey: "price",
+    leftLabel: "Revenue", rightLabel: "Price (USD)",
     statsId: "stats-chart-rev"
   });
 
-  // 3) Price vs Buybacks (USD)
   window.__charts.priceBuybacks = await makeDualAxis({
-    el: "chart-buybacks",
-    file: "data/pump_price_buybacks_usd.json",
-    leftKey: "buybacks_usd",
-    rightKey: "price",
-    leftLabel: "Buybacks (USD)",
-    rightLabel: "Price (USD)",
+    el: "chart-buybacks", file: "data/pump_price_buybacks_usd.json",
+    leftKey: "buybacks_usd", rightKey: "price",
+    leftLabel: "Buybacks (USD)", rightLabel: "Price (USD)",
     statsId: "stats-chart-bb"
   });
 
-  // 4) Cumulative Buybacks vs Circulating Market Cap
   window.__charts.bbmcap = await makeBuybacksVsMcap({
     el: "chart-bbmcap",
-    file: "data/pump_buybacks_vs_mcap.json", // expects { date, cum_buybacks_usd, mcap_usd, [pct_mcap_bought] }
+    file: "data/pump_buybacks_vs_mcap.json",
     statsId: "stats-chart-bbmcap"
   });
 })();
 
-// ============ Performance Tab (fixed wiring + YTD) ============
+/* ============ Performance Tab (fixed wiring + YTD) ============ */
 
 (() => {
   const MS_DAY = 24 * 60 * 60 * 1000;
 
   const state = {
-    range: "YTD",          // default to YTD
+    range: "YTD",
     assetsIndex: null,
-    cache: new Map(),      // symbol -> [{t: Date, p: number}]
+    cache: new Map(),
     initialized: false,
   };
 
-  // ---- helpers ----
   function startOfDayUTC(date) {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }
@@ -429,17 +357,15 @@ window.__charts = {};
   function makeBaselineStartTs(range, nowUTC = new Date()) {
     const now = nowUTC;
     switch (range) {
-      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();   // yesterday 00:00Z
-      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();   // 7 days ago 00:00Z
-      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();  // 30 days ago 00:00Z
-      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();  // 90 days ago 00:00Z
-      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                             // Jan 1 00:00Z
+      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();
+      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();
+      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
+      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();
+      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);
       default:    return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
     }
   }
 
-  // Pick the first price ON OR AFTER the baseline time.
-  // If the baseline is before the series starts, use the EARLIEST price (not the latest).
   function baselinePriceOnOrAfter(series, baselineTs) {
     if (!series?.length) return null;
     let lo = 0, hi = series.length - 1, ans = -1;
@@ -449,8 +375,7 @@ window.__charts = {};
       if (t >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
     }
     if (ans !== -1) return series[ans].p;
-    // baseline precedes the series: use earliest price available
-    return series[0].p;
+    return series[0].p; // earliest if baseline precedes series
   }
 
   function computePctChange(series, range, now = new Date()) {
@@ -478,12 +403,9 @@ window.__charts = {};
         tIso = typeof row.timestamp === "string" ? row.timestamp : new Date(row.timestamp * 1000).toISOString();
         p = row.close ?? row.c ?? row.p ?? row.price;
       }
-      if (tIso != null && p != null && !Number.isNaN(+p)) {
-        out.push({ t: new Date(tIso), p: +p });
-      }
+      if (tIso != null && p != null && !Number.isNaN(+p)) out.push({ t: new Date(tIso), p: +p });
     }
     out.sort((a, b) => a.t - b.t);
-    // dedupe
     const dedup = [];
     for (const d of out) {
       if (!dedup.length || dedup[dedup.length - 1].t.getTime() !== d.t.getTime()) dedup.push(d);
@@ -495,28 +417,26 @@ window.__charts = {};
   function formatNumber(x) {
     if (x >= 1) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
     return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
-  }
+    }
 
-  // ---- rendering ----
   async function init() {
-    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
-    // delegated click handler (works regardless of container id/classes)
+    // Delegated click handler with preventDefault (so anchor pills work)
     document.addEventListener("click", (e) => {
-      const btn = e.target.closest('#pane-performance .rng[data-range], .perf-controls .rng[data-range]');
+      const btn = e.target.closest('#pane-performance [data-range], .perf-controls [data-range]');
       if (!btn) return;
-      // toggle 'active' within the button group
-      const group = btn.closest('#pane-performance, .perf-controls') || document;
-      group.querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
+      e.preventDefault();
+      e.stopPropagation();
+      const group = btn.closest('#pane-performance') || document;
+      group.querySelectorAll('[data-range]').forEach(b => b.classList.toggle("active", b === btn));
       state.range = btn.dataset.range;
       renderTable();
     });
 
-    // set initial active button (YTD)
-    const ytdBtn = document.querySelector('#pane-performance .rng[data-range="YTD"]') ||
-                   document.querySelector('.perf-controls .rng[data-range="YTD"]');
+    const ytdBtn = document.querySelector('#pane-performance [data-range="YTD"]') ||
+                   document.querySelector('.perf-controls [data-range="YTD"]');
     if (ytdBtn) ytdBtn.classList.add("active");
 
     await renderTable();
@@ -547,12 +467,7 @@ window.__charts = {};
 
       const latest = series.at(-1);
       const pct = computePctChange(series, state.range, now);
-      rows.push({
-        symbol: a.symbol,
-        name: a.name ?? a.symbol,
-        price: latest.p,
-        changePct: pct
-      });
+      rows.push({ symbol: a.symbol, name: a.name ?? a.symbol, price: latest.p, changePct: pct });
     }
 
     rows.sort((a, b) => (b.changePct ?? -Infinity) - (a.changePct ?? -Infinity));
@@ -560,10 +475,7 @@ window.__charts = {};
     tbody.innerHTML = "";
     for (const r of rows) {
       const up = (r.changePct ?? 0) >= 0;
-      const pctTxt = (r.changePct == null || Number.isNaN(r.changePct))
-        ? "—"
-        : (r.changePct >= 0 ? "+" : "") + r.changePct.toFixed(2) + "%";
-
+      const pctTxt = (r.changePct == null || Number.isNaN(r.changePct)) ? "—" : (r.changePct >= 0 ? "+" : "") + r.changePct.toFixed(2) + "%";
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td style="text-align:left;"><strong>${r.name}</strong></td>
@@ -577,9 +489,7 @@ window.__charts = {};
     }
   }
 
-  // bootstrapping
   document.addEventListener("DOMContentLoaded", () => {
-    // if you have a nav link with id="tab-performance", this keeps lazy-load behavior
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
       perfTab.addEventListener("click", async () => {
@@ -589,7 +499,6 @@ window.__charts = {};
         }
       });
     }
-    // If the page loads directly on #performance (or you render the pane by default), init immediately.
     if ((location.hash || "").toLowerCase() === "#performance" || document.getElementById("pane-performance")?.classList.contains("active")) {
       if (!state.initialized) {
         state.initialized = true;
@@ -598,4 +507,5 @@ window.__charts = {};
     }
   });
 })();
+
 
