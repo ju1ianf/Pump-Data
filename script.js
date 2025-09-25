@@ -13,6 +13,17 @@ const ET_TZ = "America/New_York";
 const fmtET = (date, opts = {}) =>
   new Intl.DateTimeFormat(undefined, { timeZone: ET_TZ, ...opts }).format(date);
 
+// ---- Chart.js global defaults so every chart gets the same hover/tooltip ----
+if (window.Chart) {
+  Chart.defaults.responsive = true;
+  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.interaction = { mode: "index", axis: "x", intersect: false };
+  Chart.defaults.plugins.tooltip.enabled = true;
+  Chart.defaults.plugins.tooltip.mode = "index";       // keep v2/v3 compat
+  Chart.defaults.plugins.tooltip.intersect = false;
+  Chart.defaults.plugins.tooltip.position = "nearest";
+}
+
 function latestOnOrBefore(rows, key, cutoff) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const d = new Date(rows[i].date);
@@ -94,9 +105,7 @@ async function makeDualAxis({
 
     if (statsId) renderStatsBox(statsId, series, leftKey, rightKey);
 
-    const labels = series.map(d => d.date);
-    const dataL  = series.map(d => d[leftKey]);
-    const dataR  = series.map(d => d[rightKey]);
+    const toPoints = (rows, key) => rows.map(d => ({ x: d.date, y: d[key] }));
 
     const ctx = document.getElementById(el)?.getContext("2d");
     if (!ctx) return null;
@@ -104,14 +113,16 @@ async function makeDualAxis({
     const chart = new Chart(ctx, {
       type: "line",
       data: {
-        labels,
         datasets: [
           {
             label: leftLabel,
-            data: dataL,
+            data: toPoints(series, leftKey), // [{x,y}]
+            parsing: true,
             yAxisID: "yL",
             tension: .25,
             pointRadius: 0,
+            pointHitRadius: 10,
+            pointHoverRadius: 4,
             borderColor: leftColor,
             backgroundColor: rgba(leftColor, 0.12),
             borderWidth: 2,
@@ -120,10 +131,13 @@ async function makeDualAxis({
           },
           {
             label: rightLabel,
-            data: dataR,
+            data: toPoints(series, rightKey),
+            parsing: true,
             yAxisID: "yR",
             tension: .25,
             pointRadius: 0,
+            pointHitRadius: 10,
+            pointHoverRadius: 4,
             borderColor: rightColor,
             backgroundColor: rgba(rightColor, 0.12),
             borderWidth: 2,
@@ -133,8 +147,7 @@ async function makeDualAxis({
         ]
       },
       options: {
-        responsive: true,
-        interaction: { mode: "index", intersect: false }, // shared hover
+        interaction: { mode: "index", axis: "x", intersect: false }, // shared hover
         plugins: {
           legend: { position: "top" },
           tooltip: {
@@ -144,11 +157,10 @@ async function makeDualAxis({
             itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
             callbacks: {
               title: (items) => {
-                const raw = items[0].label || items[0].parsed?.x;
-                const d = typeof raw === "number" ? new Date(raw) : new Date(raw);
-                return fmtET(d, { year:"numeric", month:"short", day:"numeric" });
+                const ts = items[0].parsed.x ?? items[0].label;
+                return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
               },
-              label: c => {
+              label: (c) => {
                 const label = c.dataset.label || "";
                 const v = c.parsed.y;
                 if (/price/i.test(label) || c.dataset.yAxisID === "yR") {
@@ -165,6 +177,7 @@ async function makeDualAxis({
             padding: { top: 6 }
           }
         },
+        parsing: true,
         scales: {
           x: {
             type: "time",
@@ -190,9 +203,8 @@ async function makeDualAxis({
         if (!btn) return;
         toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
         const subset = filterByRange(series, btn.dataset.range);
-        chart.data.labels = subset.map(d => d.date);
-        chart.data.datasets[0].data = subset.map(d => d[leftKey]);
-        chart.data.datasets[1].data = subset.map(d => d[rightKey]);
+        chart.data.datasets[0].data = toPoints(subset, leftKey);
+        chart.data.datasets[1].data = toPoints(subset, rightKey);
         chart.update();
       });
     }
@@ -265,14 +277,14 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       `;
     })();
 
-    const labels = series.map(d => d.date);
-    const buyUSD = series.map(d => d.cum_buybacks_usd);
-    const mcapUSD= series.map(d => d.mcap_usd);
-    const pct    = series.map(d =>
-      (typeof d.pct_mcap_bought === "number")
-        ? d.pct_mcap_bought
-        : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
-    );
+    const toPts = (rows, key) => rows.map(d => ({ x: d.date, y: d[key] }));
+    const pctPts = (rows) =>
+      rows.map(d => ({
+        x: d.date,
+        y: (typeof d.pct_mcap_bought === "number")
+          ? d.pct_mcap_bought
+          : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
+      }));
 
     const ctx = document.getElementById(el)?.getContext("2d");
     if (!ctx) return null;
@@ -280,16 +292,14 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
     const chart = new Chart(ctx, {
       type: "line",
       data: {
-        labels,
         datasets: [
-          { label: "Market Cap (USD)",  data: mcapUSD, yAxisID: "yUSD", tension:.25, pointRadius:0, borderColor:"#000000", backgroundColor:rgba("#000000",0.12), borderWidth:2, fill:false, spanGaps:true },
-          { label: "Cum. Buybacks (USD)", data: buyUSD, yAxisID: "yUSD", tension:.25, pointRadius:0, borderColor:"#54d794", backgroundColor:rgba("#54d794",0.12), borderWidth:2, fill:false, spanGaps:true },
-          { label: "Share bought (% MC)", data: pct, yAxisID: "yPct", tension:.25, pointRadius:0, borderColor:"#777", borderDash:[6,4], backgroundColor:"transparent", borderWidth:2, fill:false, spanGaps:true }
+          { label: "Market Cap (USD)",  data: toPts(series,"mcap_usd"), yAxisID: "yUSD", tension:.25, pointRadius:0, pointHitRadius:10, pointHoverRadius:4, borderColor:"#000000", backgroundColor:rgba("#000000",0.12), borderWidth:2, fill:false, spanGaps:true },
+          { label: "Cum. Buybacks (USD)", data: toPts(series,"cum_buybacks_usd"), yAxisID: "yUSD", tension:.25, pointRadius:0, pointHitRadius:10, pointHoverRadius:4, borderColor:"#54d794", backgroundColor:rgba("#54d794",0.12), borderWidth:2, fill:false, spanGaps:true },
+          { label: "Share bought (% MC)", data: pctPts(series), yAxisID: "yPct", tension:.25, pointRadius:0, pointHitRadius:10, pointHoverRadius:4, borderColor:"#777", borderDash:[6,4], backgroundColor:"transparent", borderWidth:2, fill:false, spanGaps:true }
         ]
       },
       options: {
-        responsive: true,
-        interaction: { mode: "index", intersect: false }, // shared hover
+        interaction: { mode: "index", axis: "x", intersect: false },
         plugins: {
           legend: { position: "top" },
           tooltip: {
@@ -299,9 +309,8 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
             itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
             callbacks: {
               title: (items) => {
-                const raw = items[0].label || items[0].parsed?.x;
-                const d = typeof raw === "number" ? new Date(raw) : new Date(raw);
-                return fmtET(d, { year:"numeric", month:"short", day:"numeric" });
+                const ts = items[0].parsed.x ?? items[0].label;
+                return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
               },
               label: c => (c.dataset.yAxisID === "yPct")
                 ? `${c.dataset.label}: ${(c.parsed.y*100).toFixed(2)}%`
@@ -315,6 +324,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
             padding: { top: 6 }
           }
         },
+        parsing: true,
         scales: {
           x: {
             type: "time",
@@ -340,14 +350,9 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
         if (!btn) return;
         toolbar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
         const subset = filterByRange(series, btn.dataset.range);
-        chart.data.labels = subset.map(d => d.date);
-        chart.data.datasets[0].data = subset.map(d => d.mcap_usd);
-        chart.data.datasets[1].data = subset.map(d => d.cum_buybacks_usd);
-        chart.data.datasets[2].data = subset.map(d =>
-          (typeof d.pct_mcap_bought === "number")
-            ? d.pct_mcap_bought
-            : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
-        );
+        chart.data.datasets[0].data = toPts(subset, "mcap_usd");
+        chart.data.datasets[1].data = toPts(subset, "cum_buybacks_usd");
+        chart.data.datasets[2].data = pctPts(subset);
         chart.update();
       });
     }
@@ -358,7 +363,6 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
     return null;
   }
 }
-
 
 
 /* ========= build charts ========= */
@@ -413,21 +417,15 @@ window.__charts = {};
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours()));
   }
 
-  // Build bucket boundaries:
-  // - 24H: hourly edges from (now floored to hour - 24h) -> now (hour)
-  // - other ranges: daily midnights UTC from baseline day -> today
+  // Build bucket boundaries
   function buildBoundaries(range, nowUTC = new Date()) {
     if (range === "24H") {
       const end = floorHourUTC(nowUTC);
       const start = new Date(end.getTime() - 24 * MS_HOUR);
       const out = [];
-      for (let t = start.getTime(); t <= end.getTime(); t += MS_HOUR) {
-        out.push(new Date(t));
-      }
+      for (let t = start.getTime(); t <= end.getTime(); t += MS_HOUR) out.push(new Date(t));
       return out;
     }
-
-    // Baselines for daily ranges
     const now = startOfDayUTC(nowUTC);
     let start;
     switch (range) {
@@ -438,9 +436,7 @@ window.__charts = {};
       default:   start = new Date(now.getTime() - 30 * MS_DAY);
     }
     const out = [];
-    for (let t = start.getTime(); t <= now.getTime(); t += MS_DAY) {
-      out.push(new Date(t));
-    }
+    for (let t = start.getTime(); t <= now.getTime(); t += MS_DAY) out.push(new Date(t));
     return out;
   }
 
@@ -456,7 +452,7 @@ window.__charts = {};
     return ans === -1 ? null : series[ans].p;
   }
 
-  // Normalize any payload to [{t: Date, p: number}] (ascending, deduped)
+  // Normalize any payload to [{t: Date, p: number}]
   function normalizeSeries(payload) {
     const arr = Array.isArray(payload) ? payload : (payload?.data ?? []);
     const out = [];
@@ -475,7 +471,6 @@ window.__charts = {};
       if (iso && p != null && !Number.isNaN(+p)) out.push({ t: new Date(iso), p: +p });
     }
     out.sort((a,b) => a.t - b.t);
-    // dedupe identical timestamps
     const dedup = [];
     for (const d of out) {
       if (!dedup.length || dedup[dedup.length-1].t.getTime() !== d.t.getTime()) dedup.push(d);
@@ -521,7 +516,7 @@ window.__charts = {};
 
   // --------- Relative chart state/UI ---------
   const rel = {
-    selected: new Set(["HYPE","SOL","ETH","BTC","PUMP"]), // defaults (shown if present)
+    selected: new Set(["HYPE","SOL","ETH","BTC","PUMP"]), // defaults
     chart: null,
   };
 
@@ -559,14 +554,13 @@ window.__charts = {};
   function buildRelativePoints(series, boundaries) {
     if (!series?.length || !boundaries.length) return [];
 
-    // baseline = first boundary price (last known on/<= boundary)
     const baselinePx = latestOnOrBeforeTs(series, boundaries[0].getTime()) ?? series[0].p;
     if (!(baselinePx > 0)) return [];
 
     const pts = [];
     for (const t of boundaries) {
       const px = latestOnOrBeforeTs(series, t.getTime());
-      if (px == null) continue; // skip if nothing yet
+      if (px == null) continue;
       const ret = ((px / baselinePx) - 1) * 100;
       pts.push({ x: t, y: ret });
     }
@@ -578,8 +572,7 @@ window.__charts = {};
     if (!canvas || !state.assetsIndex) return;
 
     const now = new Date();
-    theBoundaries = buildBoundaries(state.range, now); // define local correctly
-    const boundaries = theBoundaries;
+    const boundaries = buildBoundaries(state.range, now);
 
     const datasets = [];
     for (const a of state.assetsIndex.assets) {
@@ -596,17 +589,16 @@ window.__charts = {};
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.2,
-        parsing: true,                  // use x/y keys
-        spanGaps: true                  // don’t break on missing hours/days
+        parsing: true,
+        spanGaps: true
       });
     }
 
-    // Create or update chart
     const ctx = canvas.getContext("2d");
     const xUnit = (state.range === "24H") ? "hour" : "day";
     const tooltipTitle = (ts) =>
       new Date(ts).toLocaleString(undefined, {
-        timeZone: ET_TZ,                // "America/New_York"
+        timeZone: ET_TZ,
         month: "short", day: "numeric",
         hour: xUnit === "hour" ? "numeric" : undefined,
         minute: xUnit === "hour" ? "2-digit" : undefined
@@ -617,9 +609,7 @@ window.__charts = {};
         type: "line",
         data: { datasets },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,   // lets the fixed-height wrapper control size
-          interaction: { mode: "index", intersect: false }, // shared tooltip
+          interaction: { mode: "index", axis: "x", intersect: false },
           plugins: {
             legend: { position: "top" },
             tooltip: {
@@ -717,11 +707,9 @@ window.__charts = {};
 
   // --------- init & wiring ---------
   async function init() {
-    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
-    // range buttons (ONLY inside the performance pane)
     document.addEventListener("click", (e) => {
       const btn = e.target.closest('#pane-performance .rng[data-range]');
       if (!btn) return;
@@ -732,14 +720,12 @@ window.__charts = {};
       updateRelPerfChart();
     });
 
-    // selector chips
     buildPicker();
 
     await renderTable();
     await updateRelPerfChart();
   }
 
-  // lazy init when the tab is opened; init immediately if already active
   document.addEventListener("DOMContentLoaded", () => {
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
@@ -759,6 +745,3 @@ window.__charts = {};
     }
   });
 })();
-
-
-
