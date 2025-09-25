@@ -13,10 +13,9 @@ API = Artemis(api_key=os.environ["ARTEMIS_API_KEY"])
 ASSET = "pump"
 
 # rolling window (adjust as you like)
-WINDOW_DAYS = 120
-TODAY = datetime.now(timezone.utc).date()
-START = (TODAY - timedelta(days=WINDOW_DAYS)).isoformat()
-END = TODAY.isoformat()
+START = "2025-07-14"
+END = datetime.now(timezone.utc).date().isoformat()
+
 
 os.makedirs("data", exist_ok=True)
 
