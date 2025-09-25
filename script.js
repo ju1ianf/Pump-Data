@@ -369,16 +369,16 @@ window.__charts = {};
     statsId: "stats-chart-rev"
   });
 
-  // 3) Price vs Buybacks  (using plain "buybacks")
-  window.__charts.priceBuybacks = await makeDualAxis({
-    el: "chart-buybacks",
-    file: "data/pump_buybacks.json",   // expects { date, price, buybacks }
-    leftKey: "buybacks",
-    rightKey: "price",
-    leftLabel: "Buybacks",
-    rightLabel: "Price (USD)",
-    statsId: "stats-chart-bb"
-  });
+  // 3) Price vs Buybacks (USD) — keep original file/shape
+window.__charts.priceBuybacks = await makeDualAxis({
+  el: "chart-buybacks",
+  file: "data/pump_price_buybacks_usd.json", // <-- back to original
+  leftKey: "buybacks_usd",                   // <-- back to original
+  rightKey: "price",
+  leftLabel: "Buybacks (USD)",
+  rightLabel: "Price (USD)",
+  statsId: "stats-chart-bb"
+});
 
   // 4) Cumulative Buybacks vs Circulating Market Cap
   window.__charts.bbmcap = await makeBuybacksVsMcap({
