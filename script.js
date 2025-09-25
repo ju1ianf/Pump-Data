@@ -409,16 +409,15 @@ window.__charts = {};
   });
 })();
 
-// ============ Performance Tab (safe, non-interfering) ============
+// ============ Performance Tab (fixed wiring + YTD) ============
 
 (() => {
-  const PERF_RANGES = ["24H", "1W", "1M", "3M", "YTD"];
   const MS_DAY = 24 * 60 * 60 * 1000;
 
   const state = {
-    range: "1M",
+    range: "YTD",          // default to YTD
     assetsIndex: null,
-    cache: new Map(),   // symbol -> [{t: Date, p: number}]
+    cache: new Map(),      // symbol -> [{t: Date, p: number}]
     initialized: false,
   };
 
@@ -428,22 +427,21 @@ window.__charts = {};
   }
 
   function makeBaselineStartTs(range, nowUTC = new Date()) {
-    const now = nowUTC; // now is already UTC (Date always stores UTC)
+    const now = nowUTC;
     switch (range) {
-      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();     // yesterday 00:00Z
-      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();     // 7 days ago 00:00Z
-      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();    // 30 days ago 00:00Z
-      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();    // 90 days ago 00:00Z
-      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                               // Jan 1 00:00Z
+      case "24H": return startOfDayUTC(new Date(now.getTime() - 1 * MS_DAY)).getTime();   // yesterday 00:00Z
+      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime();   // 7 days ago 00:00Z
+      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();  // 30 days ago 00:00Z
+      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();  // 90 days ago 00:00Z
+      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                             // Jan 1 00:00Z
       default:    return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
     }
   }
 
-  // Pick the first price ON OR AFTER the baseline day start.
-  // If none exists after, fall back to the latest before.
+  // Pick the first price ON OR AFTER the baseline time.
+  // If the baseline is before the series starts, use the EARLIEST price (not the latest).
   function baselinePriceOnOrAfter(series, baselineTs) {
     if (!series?.length) return null;
-    // binary search for first item with t >= baselineTs
     let lo = 0, hi = series.length - 1, ans = -1;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
@@ -451,19 +449,17 @@ window.__charts = {};
       if (t >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
     }
     if (ans !== -1) return series[ans].p;
-    // if all points are before baseline, use the last before
-    return series[series.length - 1].p;
+    // baseline precedes the series: use earliest price available
+    return series[0].p;
   }
 
   function computePctChange(series, range, now = new Date()) {
     if (!series?.length) return null;
     const end = series.at(-1)?.p;
     if (end == null) return null;
-
     const baselineTs = makeBaselineStartTs(range, now);
     const start = baselinePriceOnOrAfter(series, baselineTs);
     if (start == null || start <= 0) return null;
-
     return ((end - start) / start) * 100;
   }
 
@@ -487,7 +483,7 @@ window.__charts = {};
       }
     }
     out.sort((a, b) => a.t - b.t);
-    // dedupe identical timestamps
+    // dedupe
     const dedup = [];
     for (const d of out) {
       if (!dedup.length || dedup[dedup.length - 1].t.getTime() !== d.t.getTime()) dedup.push(d);
@@ -507,15 +503,21 @@ window.__charts = {};
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
-    // range buttons
-    document
-      .querySelectorAll("#panel-performance .rng")
-      .forEach(btn => btn.addEventListener("click", () => {
-        document.querySelectorAll("#panel-performance .rng").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.range = btn.dataset.range;
-        renderTable();
-      }));
+    // delegated click handler (works regardless of container id/classes)
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest('#pane-performance .rng[data-range], .perf-controls .rng[data-range]');
+      if (!btn) return;
+      // toggle 'active' within the button group
+      const group = btn.closest('#pane-performance, .perf-controls') || document;
+      group.querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
+      state.range = btn.dataset.range;
+      renderTable();
+    });
+
+    // set initial active button (YTD)
+    const ytdBtn = document.querySelector('#pane-performance .rng[data-range="YTD"]') ||
+                   document.querySelector('.perf-controls .rng[data-range="YTD"]');
+    if (ytdBtn) ytdBtn.classList.add("active");
 
     await renderTable();
   }
@@ -547,7 +549,7 @@ window.__charts = {};
       const pct = computePctChange(series, state.range, now);
       rows.push({
         symbol: a.symbol,
-        name: a.name ?? a.symbol,   // show display ticker only
+        name: a.name ?? a.symbol,
         price: latest.p,
         changePct: pct
       });
@@ -575,8 +577,9 @@ window.__charts = {};
     }
   }
 
-  // ---- non-interfering bootstrapping ----
+  // bootstrapping
   document.addEventListener("DOMContentLoaded", () => {
+    // if you have a nav link with id="tab-performance", this keeps lazy-load behavior
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
       perfTab.addEventListener("click", async () => {
@@ -586,10 +589,12 @@ window.__charts = {};
         }
       });
     }
-    // If the page loads directly on #performance, init immediately.
-    if ((location.hash || "").toLowerCase() === "#performance" && !state.initialized) {
-      state.initialized = true;
-      init().catch(e => console.error("Performance init error:", e));
+    // If the page loads directly on #performance (or you render the pane by default), init immediately.
+    if ((location.hash || "").toLowerCase() === "#performance" || document.getElementById("pane-performance")?.classList.contains("active")) {
+      if (!state.initialized) {
+        state.initialized = true;
+        init().catch(e => console.error("Performance init error:", e));
+      }
     }
   });
 })();
