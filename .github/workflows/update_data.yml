@@ -16,11 +16,28 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # allow rebase/pull
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Pull BEFORE generating data so the working tree is clean
+      - name: Sync with remote
+        run: |
+          # default to the current ref name; fall back to 'main' if empty
+          BRANCH="${{ github.ref_name }}"
+          [ -z "$BRANCH" ] && BRANCH=main
+          git pull --rebase origin "$BRANCH"
 
       - name: Install deps
         run: pip install artemis pandas
@@ -32,10 +49,8 @@ jobs:
 
       - name: Commit data
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin ${{ github.ref_name }}
-          git add data/
+          git add -A
           git commit -m "refresh data" || echo "no changes"
-          git push
-
+          BRANCH="${{ github.ref_name }}"
+          [ -z "$BRANCH" ] && BRANCH=main
+          git push origin HEAD:"$BRANCH"
