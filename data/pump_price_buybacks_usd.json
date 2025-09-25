@@ -1,6 +1,251 @@
 {
   "series": [
     {
+      "date": "2025-05-28",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-05-29",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-05-30",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-05-31",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-01",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-02",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-03",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-04",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-05",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-06",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-07",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-08",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-09",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-10",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-11",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-12",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-13",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-14",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-15",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-16",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-17",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-18",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-19",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-20",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-21",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-22",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-23",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-24",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-25",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-26",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-27",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-28",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-29",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-06-30",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-01",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-02",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-03",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-04",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-05",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-06",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-07",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-08",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-09",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-10",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-11",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-12",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-13",
+      "price": null,
+      "buybacks_usd": null
+    },
+    {
+      "date": "2025-07-14",
+      "price": 0.005784550914,
+      "buybacks_usd": 0.0
+    },
+    {
+      "date": "2025-07-15",
+      "price": 0.00678292754,
+      "buybacks_usd": 16060379.242848529
+    },
+    {
       "date": "2025-07-16",
       "price": 0.005828663391,
       "buybacks_usd": 3646264.594334881
@@ -352,8 +597,13 @@
     },
     {
       "date": "2025-09-24",
-      "price": 0.00571929,
-      "buybacks_usd": 1311819.8572949832
+      "price": 0.005633332453,
+      "buybacks_usd": 1239382.7135560233
+    },
+    {
+      "date": "2025-09-25",
+      "price": 0.00532302,
+      "buybacks_usd": 1171111.2431150144
     }
   ]
 }
