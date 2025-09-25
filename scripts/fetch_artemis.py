@@ -1,23 +1,34 @@
-import os, json, pandas as pd
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import json
 from datetime import datetime, timedelta, timezone
+
+import pandas as pd
 from artemis import Artemis
 
+# ---------------- Config ----------------
 API = Artemis(api_key=os.environ["ARTEMIS_API_KEY"])
 ASSET = "pump"
 
-# ---------- Rolling window ----------
+# rolling window (adjust as you like)
 WINDOW_DAYS = 120
 TODAY = datetime.now(timezone.utc).date()
-END = TODAY.isoformat()
 START = (TODAY - timedelta(days=WINDOW_DAYS)).isoformat()
+END = TODAY.isoformat()
+
+os.makedirs("data", exist_ok=True)
 
 
-# ---------- Robust normalizer ----------
+# --------------- Helpers ----------------
 def to_df_vals(rows, colname):
     """
     Convert Artemis rows -> tidy df(date, <colname>), coercing bad values to NaN.
-    Handles rows as list[dict] or {"rows":[...]}; value col may be v/val/value/<colname>;
-    time col may be t/timestamp/date/time. Non-numeric values -> NaN.
+    Handles:
+      - rows as list[dict] or {"rows":[...]}
+      - value column in: v / val / value / already-named
+      - time column in: t(ms) / timestamp / date / time
     """
     if not rows:
         return pd.DataFrame(columns=["date", colname])
@@ -25,24 +36,21 @@ def to_df_vals(rows, colname):
     if isinstance(rows, dict) and "rows" in rows and isinstance(rows["rows"], list):
         rows = rows["rows"]
 
-    if not isinstance(rows, list) or (len(rows) > 0 and not isinstance(rows[0], dict)):
+    if not isinstance(rows, list) or (rows and not isinstance(rows[0], dict)):
         return pd.DataFrame(columns=["date", colname])
 
     df = pd.DataFrame(rows)
 
-    # Normalize value column to `colname`
-    if colname in df.columns:
-        pass
-    elif "v" in df.columns:
-        df = df.rename(columns={"v": colname})
-    elif "val" in df.columns:
-        df = df.rename(columns={"val": colname})
-    elif "value" in df.columns:
-        df = df.rename(columns={"value": colname})
-    else:
-        df[colname] = pd.NA  # unknown value column → empty
+    # value column
+    if colname not in df.columns:
+        for k in ("v", "val", "value"):
+            if k in df.columns:
+                df = df.rename(columns={k: colname})
+                break
+        if colname not in df.columns:
+            df[colname] = pd.NA
 
-    # Normalize/parse date column
+    # date column
     if "t" in df.columns:
         df["date"] = (
             pd.to_datetime(df["t"], unit="ms", errors="coerce")
@@ -60,33 +68,49 @@ def to_df_vals(rows, colname):
     else:
         return pd.DataFrame(columns=["date", colname])
 
-    # Coerce numeric values
     df[colname] = pd.to_numeric(df[colname], errors="coerce")
-
-    # Clean and return
     df = df.loc[~df["date"].isna(), ["date", colname]]
     return df.sort_values("date").reset_index(drop=True)
 
 
-# ---------- 1) Price + Fees ----------
+def fetch_block(metric_names: str):
+    r = API.fetch_metrics(metric_names=metric_names, symbols=ASSET,
+                          start_date=START, end_date=END)
+    return r.model_dump() if hasattr(r, "model_dump") else r.__dict__
+
+
+def ensure_cumulative(series: pd.Series) -> pd.Series:
+    s = series.copy()
+    if s.dropna().is_monotonic_increasing:
+        return s
+    return s.fillna(0).cumsum()
+
+
+def _norm(s: str) -> str:
+    # normalize a key: lowercase & strip non-alphanumerics
+    return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+
+# --------------- 1) Price + Fees ----------------
 resp = API.fetch_metrics(
     metric_names="price,fees",
-    symbols=ASSET, start_date=START, end_date=END
+    symbols=ASSET,
+    start_date=START,
+    end_date=END,
 )
 sym = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
 df_price = to_df_vals(sym.get("price", []), "price")
-df_fees  = to_df_vals(sym.get("fees",  []), "fees")
+df_fees = to_df_vals(sym.get("fees", []), "fees")
 df_pf = pd.merge(df_price, df_fees, on="date", how="outer").sort_values("date")
 
-os.makedirs("data", exist_ok=True)
 with open("data/pump.json", "w") as f:
     json.dump({
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
                 "price": None if pd.isna(p) else float(p),
-                "fees":  None if pd.isna(x) else float(x)
+                "fees": None if pd.isna(x) else float(x),
             }
             for d, p, x in zip(df_pf["date"], df_pf["price"], df_pf["fees"])
         ]
@@ -94,11 +118,12 @@ with open("data/pump.json", "w") as f:
 print("wrote data/pump.json rows:", len(df_pf))
 
 
-# ---------- 2) Price + Revenue (fallback to fees) ----------
-def try_fetch(metric_names):
+# --------------- 2) Price + Revenue (fallback to fees) ----------------
+def try_fetch(metric_names: str):
     r = API.fetch_metrics(metric_names=metric_names, symbols=ASSET,
                           start_date=START, end_date=END)
     return r.model_dump() if hasattr(r, "model_dump") else r.__dict__
+
 
 candidates = [
     "price,revenue",
@@ -125,7 +150,7 @@ if sym_rev is None:
     raise RuntimeError("No revenue-like metric found (tried revenue/protocol_revenue/revenue_usd/fees).")
 
 df_price_r = to_df_vals(sym_rev.get("price", []), "price")
-df_rev     = to_df_vals(sym_rev.get(used_key, []), "revenue")
+df_rev = to_df_vals(sym_rev.get(used_key, []), "revenue")
 df_pr = pd.merge(df_price_r, df_rev, on="date", how="outer").sort_values("date")
 
 with open("data/pump_price_revenue.json", "w") as f:
@@ -133,8 +158,8 @@ with open("data/pump_price_revenue.json", "w") as f:
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
-                "price":   None if pd.isna(p)  else float(p),
-                "revenue": None if pd.isna(rv) else float(rv)
+                "price": None if pd.isna(p) else float(p),
+                "revenue": None if pd.isna(rv) else float(rv),
             }
             for d, p, rv in zip(df_pr["date"], df_pr["price"], df_pr["revenue"])
         ]
@@ -142,51 +167,7 @@ with open("data/pump_price_revenue.json", "w") as f:
 print("wrote data/pump_price_revenue.json using metric:", used_key, "rows:", len(df_pr))
 
 
-# ---------- 3) Price + Buybacks (USD) ----------
-resp = API.fetch_metrics(
-    metric_names="price,buybacks_native",
-    symbols=ASSET,
-    start_date=START,
-    end_date=END,
-)
-sym_bb = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
-
-df_price2     = to_df_vals(sym_bb.get("price", []),            "price")
-df_bb_native  = to_df_vals(sym_bb.get("buybacks_native", []),  "buybacks_native")
-print("buybacks section: len(price)=", len(df_price2), "len(buybacks_native)=", len(df_bb_native))
-
-df_pbb = (pd.merge(df_price2, df_bb_native, on="date", how="outer")
-            .sort_values("date")
-            .reset_index(drop=True))
-
-# forward-fill native buybacks
-df_pbb["buybacks_native"] = df_pbb["buybacks_native"].ffill()
-
-# Convert to USD
-df_pbb["buybacks_usd"] = df_pbb["buybacks_native"] * df_pbb["price"]
-
-out_file = "data/pump_price_buybacks_usd.json"
-with open(out_file, "w") as f:
-    json.dump({
-        "series": [
-            {
-                "date": d.strftime("%Y-%m-%d"),
-                "price":        None if pd.isna(p)  else float(p),
-                "buybacks_usd": None if pd.isna(bu) else float(bu),
-            }
-            for d, p, bu in zip(df_pbb["date"], df_pbb["price"], df_pbb["buybacks_usd"])
-        ]
-    }, f, indent=2)
-print(f"wrote {out_file} rows:", len(df_pbb))
-
-
-# ---------- 4) Cumulative Buybacks (USD) vs Market Cap ----------
-def fetch_block(metric_names):
-    r = API.fetch_metrics(metric_names=metric_names, symbols=ASSET,
-                          start_date=START, end_date=END)
-    return r.model_dump() if hasattr(r, "model_dump") else r.__dict__
-
-# (a) Price + buybacks_native
+# --------------- 3) Price + Buybacks (USD) ----------------
 resp_bb = API.fetch_metrics(
     metric_names="price,buybacks_native",
     symbols=ASSET,
@@ -194,95 +175,126 @@ resp_bb = API.fetch_metrics(
     end_date=END,
 )
 sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
-df_price_bb  = to_df_vals(sym_bb.get("price", []), "price")
-df_bb_native = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native").sort_values("date").reset_index(drop=True)
-df_bb_native["buybacks_native"] = df_bb_native["buybacks_native"].ffill()
 
-# (b) Market-cap / supply candidates (includes CMC)
-mcap_candidates = [
-    "market_cap", "marketcap_usd", "marketcap",
-    "circulating_market_cap", "circulating_market_cap_usd",
-    "circulating_marketcap", "circ_market_cap",
-    "cmc", "CMC",
-]
-supply_candidates = ["circulating_supply", "supply_circulating", "supply"]
+df_price2 = to_df_vals(sym_bb.get("price", []), "price")
+df_bb_native = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native")
+print("buybacks section: len(price)=", len(df_price2), "len(buybacks_native)=", len(df_bb_native))
 
-sym_mc, used_mcap_key = None, None
-try:
-    queries = [
-        # direct market-cap keys
-        "price,market_cap", "price,marketcap_usd", "price,marketcap",
-        "price,circulating_market_cap", "price,circulating_market_cap_usd",
-        "price,circulating_marketcap", "price,circ_market_cap",
-        "price,cmc", "price,CMC",
-        # supply fallbacks
-        "price,circulating_supply", "price,supply_circulating", "price,supply",
-    ]
-    for names in queries:
-        block = fetch_block(names)
-        d = block["data"]["symbols"][ASSET]
-        for k in mcap_candidates:
-            if k in d:
-                sym_mc, used_mcap_key = d, k
-                break
-        if sym_mc:
-            break
-        for k in supply_candidates:
-            if k in d:
-                sym_mc, used_mcap_key = d, k
-                break
-        if sym_mc:
-            break
-except Exception:
-    pass
-
-# Core frame
-df_core = (
-    pd.merge(df_price_bb, df_bb_native, on="date", how="outer")
-      .sort_values("date").reset_index(drop=True)
+df_pbb = (
+    pd.merge(df_price2, df_bb_native, on="date", how="outer")
+    .sort_values("date")
+    .reset_index(drop=True)
 )
+df_pbb["buybacks_native"] = df_pbb["buybacks_native"].ffill()  # carry-forward
+df_pbb["buybacks_usd"] = df_pbb["buybacks_native"] * df_pbb["price"]
 
-# USD buybacks (cumulative)
+with open("data/pump_price_buybacks_usd.json", "w") as f:
+    json.dump({
+        "series": [
+            {
+                "date": d.strftime("%Y-%m-%d"),
+                "price": None if pd.isna(p) else float(p),
+                "buybacks_usd": None if pd.isna(bu) else float(bu),
+            }
+            for d, p, bu in zip(df_pbb["date"], df_pbb["price"], df_pbb["buybacks_usd"])
+        ]
+    }, f, indent=2)
+print("wrote data/pump_price_buybacks_usd.json rows:", len(df_pbb))
+
+
+# --------------- 4) Cum. Buybacks vs Market Cap ----------------
+# Build a base frame with price & buybacks_native again (to keep consistent alignment)
+df_price_bb = to_df_vals(sym_bb.get("price", []), "price")
+df_bb_native2 = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native").sort_values("date").reset_index(drop=True)
+df_bb_native2["buybacks_native"] = df_bb_native2["buybacks_native"].ffill()
+
+df_core = (
+    pd.merge(df_price_bb, df_bb_native2, on="date", how="outer")
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 df_core["buybacks_usd_raw"] = df_core["buybacks_native"] * df_core["price"]
-
-def ensure_cumulative(series: pd.Series) -> pd.Series:
-    s = series.copy()
-    if s.dropna().is_monotonic_increasing:
-        return s
-    return s.fillna(0).cumsum()
-
 df_core["cum_buybacks_usd"] = ensure_cumulative(df_core["buybacks_usd_raw"])
 
-# Always create mcap column
-df_core["mcap_usd"] = pd.NA
+# Find a usable Market Cap or Circulating Supply (to compute price * supply)
+MCAP_ALIASES   = {"cmc", "circulatingmarketcap", "marketcap", "mc",
+                  "circulatingmarketcapusd", "marketcapusd"}
+SUPPLY_ALIASES = {"circulatingsupply", "supplycirculating", "supply"}
 
-if sym_mc is not None and used_mcap_key in mcap_candidates:
-    # direct market cap
-    df_mcap = to_df_vals(sym_mc[used_mcap_key], "mcap_usd")
-    df_core = (pd.merge(df_core, df_mcap, on="date", how="outer")
-                 .sort_values("date").reset_index(drop=True))
-elif sym_mc is not None and used_mcap_key in supply_candidates:
-    # compute market cap from circulating supply * price
-    df_sup = to_df_vals(sym_mc[used_mcap_key], "circ_supply")
-    df_core = (pd.merge(df_core, df_sup, on="date", how="outer")
-                 .sort_values("date").reset_index(drop=True))
+sym_mc, used_mcap_key, used_kind = None, None, None
+probes = [
+    "price,cmc",
+    "price,CMC",
+    "price,mc",
+    "price,MC",
+    "price,market_cap",
+    "price,marketcap",
+    "price,circulating_market_cap",
+    "price,circulating_market_cap_usd",
+    "price,marketcap_usd",
+    "price,circulating_supply",
+    "price,supply_circulating",
+    "price,supply",
+    "price,*",  # last resort
+]
+
+for names in probes:
+    try:
+        block = fetch_block(names)
+        d = block["data"]["symbols"][ASSET]
+
+        # Prefer direct market-cap fields
+        found = None
+        for k in d.keys():
+            nk = _norm(k)
+            if nk in MCAP_ALIASES or k in {"CMC", "MC", "Market Cap", "Circulating Market Cap"}:
+                found = k
+                break
+        if found is not None:
+            sym_mc, used_mcap_key, used_kind = d, found, "mcap"
+            break
+
+        # Else try supply-based fields
+        for k in d.keys():
+            if _norm(k) in SUPPLY_ALIASES:
+                sym_mc, used_mcap_key, used_kind = d, k, "supply"
+                break
+        if sym_mc is not None:
+            break
+    except Exception:
+        continue
+
+# Always ensure the column exists
+if "mcap_usd" not in df_core.columns:
+    df_core["mcap_usd"] = pd.NA
+
+# Populate mcap_usd using what we found
+if sym_mc is not None and used_kind == "mcap":
+    df_mcap = to_df_vals(sym_mc.get(used_mcap_key, []), "mcap_usd")
+    df_core = (
+        pd.merge(df_core, df_mcap, on="date", how="outer")
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
+elif sym_mc is not None and used_kind == "supply":
+    df_sup = to_df_vals(sym_mc.get(used_mcap_key, []), "circ_supply")
+    df_core = (
+        pd.merge(df_core, df_sup, on="date", how="outer")
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
     df_core["mcap_usd"] = df_core["price"] * df_core["circ_supply"]
 else:
-    # Helpful debug
+    # Debug: print keys to help diagnose if nothing matched
     try:
         peek = fetch_block("price,*")["data"]["symbols"][ASSET]
-        print("DEBUG: No market cap/supply key matched. Available keys:", list(peek.keys()))
+        print("WARN: No mcap/supply key matched. Sample keys:", list(peek.keys()))
     except Exception:
-        pass
-    print("WARN: No market cap or supply metrics found; mcap_usd will remain NaN.")
+        print("WARN: No mcap/supply key matched and peek failed.")
 
-# % of supply (proxy) retired; guard divide-by-zero/NaN
+# % of circulating value retired (proxy)
 df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
-mask_bad = ~(pd.to_numeric(df_core["mcap_usd"], errors="coerce") > 0)
-df_core.loc[mask_bad, "pct_bought"] = pd.NA
 
-# Write JSON (FIXED indentation)
-os.makedirs("data", exist_ok=True)
 out_bbmcap = "data/pump_buybacks_vs_mcap.json"
 with open(out_bbmcap, "w") as f:
     json.dump({
@@ -294,12 +306,10 @@ with open(out_bbmcap, "w") as f:
                 "pct_bought": None if pd.isna(pb) else float(pb),
             }
             for d, bu, mc, pb in zip(
-                df_core["date"],
-                df_core["cum_buybacks_usd"],
-                df_core["mcap_usd"],
-                df_core["pct_bought"],
+                df_core["date"], df_core["cum_buybacks_usd"], df_core["mcap_usd"], df_core["pct_bought"]
             )
         ]
     }, f, indent=2)
 print(f"wrote {out_bbmcap} rows:", len(df_core))
+
 
