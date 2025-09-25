@@ -204,31 +204,50 @@ print("wrote data/pump_price_buybacks_usd.json rows:", len(df_pbb))
 
 # ---------- 4) PUMP: Cumulative Buybacks (USD) vs Market Cap ----------
 
+# Pull only what we need to compute both series
 resp = API.fetch_metrics(
-    metric_names="mc,buybacks",       # exactly the two you need
+    metric_names="price,buybacks_native,mc,circ_supply",
     symbols=ASSET,
     start_date=START,
     end_date=END,
 )
 sym = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
-# Normalize to tidy dataframes
-df_mc  = to_df_vals(sym.get("mc", []), "mcap_usd")
-df_bb  = to_df_vals(sym.get("buybacks", []), "buybacks_usd")  # treat as USD series
+# Parse to tidy frames
+df_price   = to_df_vals(sym.get("price", []), "price")
+df_bb_nat  = to_df_vals(sym.get("buybacks_native", []), "buybacks_native")
+df_mc_raw  = to_df_vals(sym.get("mc", []), "mcap_usd")
+df_supply  = to_df_vals(sym.get("circ_supply", []), "circ_supply")
 
-# Make sure buybacks are cumulative (if the metric is already cumulative, this is a no-op)
+# buybacks in USD = native * price (align on date first)
+import pandas as pd
+df_bb = (df_bb_nat.merge(df_price, on="date", how="outer")
+                 .sort_values("date").reset_index(drop=True))
+df_bb["buybacks_usd"] = (df_bb["buybacks_native"] * df_bb["price"]).astype("float")
 df_bb["cum_buybacks_usd"] = ensure_cumulative(df_bb["buybacks_usd"])
 
-# Merge to a single frame for writing/plotting
-df_core = (
-    pd.merge(df_mc, df_bb[["date", "cum_buybacks_usd"]], on="date", how="outer")
-      .sort_values("date").reset_index(drop=True)
-)
+# market cap: prefer mc; if missing, compute price * circ_supply
+df_core = df_bb[["date", "cum_buybacks_usd"]].copy()
+if not df_mc_raw.empty:
+    df_core = df_core.merge(df_mc_raw, on="date", how="outer")
+else:
+    df_core["mcap_usd"] = pd.NA  # will backfill from supply branch below
 
-# Optional: forward-fill market cap if sparse
-df_core["mcap_usd"] = df_core["mcap_usd"].ffill()
+if not df_supply.empty:
+    tmp = (df_price.merge(df_supply, on="date", how="outer")
+                   .sort_values("date").reset_index(drop=True))
+    tmp["mcap_from_supply"] = (tmp["price"] * tmp["circ_supply"]).astype("float")
+    # fill mcap_usd only where missing
+    df_core = (df_core.merge(tmp[["date", "mcap_from_supply"]], on="date", how="outer")
+                     .sort_values("date").reset_index(drop=True))
+    df_core["mcap_usd"] = df_core["mcap_usd"].fillna(df_core["mcap_from_supply"])
+    df_core = df_core.drop(columns=["mcap_from_supply"], errors="ignore")
 
-# Write JSON for the chart (cumulative buybacks on one axis, market cap on the other)
+# tidy & small cleanups
+df_core = df_core.sort_values("date").reset_index(drop=True)
+df_core["mcap_usd"] = pd.to_numeric(df_core["mcap_usd"], errors="coerce").ffill()
+
+# Write JSON used by the dashboard
 out_file = "data/pump_buybacks_vs_mcap.json"
 with open(out_file, "w") as f:
     json.dump({
@@ -238,15 +257,12 @@ with open(out_file, "w") as f:
                 "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
                 "mcap_usd": None if pd.isna(mc) else float(mc),
             }
-            for d, cb, mc in zip(
-                df_core["date"],
-                df_core["cum_buybacks_usd"],
-                df_core["mcap_usd"],
-            )
+            for d, cb, mc in zip(df_core["date"], df_core["cum_buybacks_usd"], df_core["mcap_usd"])
         ]
     }, f, indent=2)
 
 print("wrote", out_file, "rows:", len(df_core))
+
 
 
 
