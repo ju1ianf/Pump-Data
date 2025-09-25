@@ -11,8 +11,12 @@ from pathlib import Path
 # ---------------- Config ----------------
 API   = Artemis(api_key=os.environ["ARTEMIS_API_KEY"])
 ASSET = "pump"                           # use "pump" if that's how Artemis lists the symbol
-START = "2025-07-17"                     # fixed start date
+START = "2025-07-17"                     # fixed start date for PUMP charts
 END   = datetime.now(timezone.utc).date().isoformat()
+
+# YTD needs Jan 1 (UTC) of the current year
+NOW_UTC = datetime.now(timezone.utc)
+START_PERF = datetime(NOW_UTC.year, 1, 1, tzinfo=timezone.utc).date().isoformat()
 
 # output dirs
 os.makedirs("data", exist_ok=True)
@@ -172,7 +176,7 @@ if sym_rev is None:
 
 df_price_r = to_df_vals(sym_rev.get("price", []), "price")
 df_rev      = to_df_vals(sym_rev.get(used_key, []), "revenue")
-df_pr       = pd.merge(df_price_r, df_rev, on="date", how="outer").sort_values("date")
+df_pr       = pd.merge(df_price_r, df_rev, on("date"), how="outer").sort_values("date")  # type: ignore
 df_pr       = trim_from(df_pr)
 
 with open("data/pump_price_revenue.json", "w") as f:
@@ -276,8 +280,8 @@ with open("data/pump_buybacks_vs_mcap.json", "w") as f:
                 "cum_buybacks_usd": None if pd.isna(cb_usd) else float(cb_usd),
                 "mcap_usd":         None if pd.isna(mc)     else float(mc),
                 # NEW fields exposed to the frontend:
-                "pct_mcap_bought":  None if pd.isna(p1)     else float(p1),   # use this for your stat table
-                "pct_circ_retired": None if pd.isna(p2)     else float(p2),   # optional alternative
+                "pct_mcap_bought":  None if pd.isna(p1)     else float(p1),
+                "pct_circ_retired": None if pd.isna(p2)     else float(p2),
             }
             for d, cb_usd, mc, p1, p2 in zip(
                 df_core["date"],
@@ -291,7 +295,8 @@ with open("data/pump_buybacks_vs_mcap.json", "w") as f:
 print("wrote data/pump_buybacks_vs_mcap.json rows:", len(df_core))
 
 # ---------------- 5) Performance series for dashboard ----------------
-# Reads data/assets.json and writes each asset's price series to its "path" as [{t, p}, ...]
+# Reads data/assets.json and writes each asset's price series to its "path" as [{t, p}, ...].
+# Uses START_PERF so YTD is measured from Jan 1 UTC of the current year.
 try:
     with open("data/assets.json", "r") as f:
         assets_idx = json.load(f)
@@ -299,21 +304,23 @@ except FileNotFoundError:
     assets_idx = {"assets": []}
 
 def fetch_price_series(symbol: str):
-    """
-    Pull a price series for the symbol using Artemis metrics API.
-    We keep **timestamps** (hourly/daily) for 24H/1W/1M/3M/YTD calculations on the frontend.
-    """
+    """Pull price series for Performance (keep timestamps)."""
     try:
-        r = API.fetch_metrics(metric_names="price", symbols=symbol,
-                              start_date=START, end_date=END)
+        r = API.fetch_metrics(
+            metric_names="price",
+            symbols=symbol,
+            start_date=START_PERF,   # <-- YTD-safe start
+            end_date=END,
+        )
         payload = r.model_dump() if hasattr(r, "model_dump") else r.__dict__
         dat = payload["data"]["symbols"].get(symbol, {})
         rows = dat.get("price", [])
-        df = to_df_vals_ts(rows, "price")
-        return df
+        return to_df_vals_ts(rows, "price")
     except Exception as e:
         print(f"[perf] fetch failed for {symbol}: {e}")
         return pd.DataFrame(columns=["ts", "price"])
+
+Path("data/perf").mkdir(parents=True, exist_ok=True)
 
 for a in assets_idx.get("assets", []):
     sym  = a.get("symbol")
@@ -322,17 +329,13 @@ for a in assets_idx.get("assets", []):
         continue
 
     df = fetch_price_series(sym)
-    # Trim to START and drop empties
-    df = df.loc[df["ts"] >= pd.to_datetime(START, utc=True)].reset_index(drop=True)
+    # keep only data from Jan 1 UTC (or first available point after)
+    df = df[df["ts"] >= pd.to_datetime(START_PERF, utc=True)].reset_index(drop=True)
 
-    # write as [{t, p}]
     try:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         out = [
-            {
-                "t": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "p": None if pd.isna(px) else float(px),
-            }
+            {"t": ts.strftime("%Y-%m-%dT%H:%M:%SZ"), "p": None if pd.isna(px) else float(px)}
             for ts, px in zip(df["ts"], df["price"])
         ]
         with open(path, "w") as f:
