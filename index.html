@@ -125,7 +125,15 @@
 
     /* NEW: relative performance picker + framed chart */
     .relperf{ margin-top:8px; }
-    .asset-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px;max-height:112px;overflow:auto;}
+    .asset-picker{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:8px 0 6px;
+      max-height:112px;
+      overflow:auto;
+      justify-content:center; /* centered chips */
+    }
     .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
     .asset-btn.on{background:#111;color:#fff;border-color:#111;}
     .tz-note{ text-align:right; color:#666; font-size:12px; margin:0 4px 6px; }
@@ -330,4 +338,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
