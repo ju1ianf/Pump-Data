@@ -10,7 +10,7 @@ from artemis import Artemis
 # ---------------- Config ----------------
 API   = Artemis(api_key=os.environ["ARTEMIS_API_KEY"])
 ASSET = "pump"                           # use "pump" if that's how Artemis lists the symbol
-START = "2025-07-14"                     # fixed start date
+START = "2025-07-17"                     # fixed start date
 END   = datetime.now(timezone.utc).date().isoformat()
 
 os.makedirs("data", exist_ok=True)
