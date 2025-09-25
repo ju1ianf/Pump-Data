@@ -387,113 +387,144 @@ window.__charts = {};
 // ============ Performance Tab (table + relative chart) ============
 (() => {
   const MS_HOUR = 60 * 60 * 1000;
-  const MS_DAY = 24 * MS_HOUR;
+  const MS_DAY  = 24 * MS_HOUR;
 
   const state = {
     range: "YTD",          // default
     assetsIndex: null,
-    cache: new Map(),      // cache key -> [{t: Date, p: number}]
+    cache: new Map(),      // symbol -> [{t: Date, p: number}]  (ascending)
     initialized: false,
   };
 
-  // ---- helpers ----
-  function startOfDayUTC(date) {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  // --------- helpers ---------
+  function startOfDayUTC(d) {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
+  function floorHourUTC(d) {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours()));
   }
 
-  function makeBaselineStartTs(range, nowUTC = new Date()) {
-    const now = nowUTC;
-    switch (range) {
-      case "24H": return now.getTime() - 24 * MS_HOUR;                                  // rolling 24 hours
-      case "1W":  return startOfDayUTC(new Date(now.getTime() - 7 * MS_DAY)).getTime(); // 7 days ago 00:00Z
-      case "1M":  return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
-      case "3M":  return startOfDayUTC(new Date(now.getTime() - 90 * MS_DAY)).getTime();
-      case "YTD": return Date.UTC(now.getUTCFullYear(), 0, 1);                           // Jan 1 00:00Z
-      default:    return startOfDayUTC(new Date(now.getTime() - 30 * MS_DAY)).getTime();
+  // Build bucket boundaries:
+  // - 24H: hourly edges from (now floored to hour - 24h) -> now (hour)
+  // - other ranges: daily midnights UTC from baseline day -> today
+  function buildBoundaries(range, nowUTC = new Date()) {
+    if (range === "24H") {
+      const end = floorHourUTC(nowUTC);
+      const start = new Date(end.getTime() - 24 * MS_HOUR);
+      const out = [];
+      for (let t = start.getTime(); t <= end.getTime(); t += MS_HOUR) {
+        out.push(new Date(t));
+      }
+      return out;
     }
+
+    // Baselines for daily ranges
+    const now = startOfDayUTC(nowUTC);
+    let start;
+    switch (range) {
+      case "1W": start = new Date(now.getTime() - 7 * MS_DAY); break;
+      case "1M": start = new Date(now.getTime() - 30 * MS_DAY); break;
+      case "3M": start = new Date(now.getTime() - 90 * MS_DAY); break;
+      case "YTD": start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1)); break;
+      default:   start = new Date(now.getTime() - 30 * MS_DAY);
+    }
+    const out = [];
+    for (let t = start.getTime(); t <= now.getTime(); t += MS_DAY) {
+      out.push(new Date(t));
+    }
+    return out;
   }
 
-  // first price ON/AFTER baseline; if baseline precedes series, use earliest
-  function baselinePriceOnOrAfter(series, baselineTs) {
+  // Binary search: last price with t <= ts
+  function latestOnOrBeforeTs(series, ts) {
     if (!series?.length) return null;
     let lo = 0, hi = series.length - 1, ans = -1;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
-      const t = series[mid].t.getTime();
-      if (t >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
+      const tm  = series[mid].t.getTime();
+      if (tm <= ts) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
     }
-    if (ans !== -1) return series[ans].p;
-    return series[0].p;
+    return ans === -1 ? null : series[ans].p;
   }
 
-  function computePctChange(series, range, now = new Date()) {
-    if (!series?.length) return null;
-    const end = series.at(-1)?.p;
-    if (end == null) return null;
-    const baselineTs = makeBaselineStartTs(range, now);
-    const start = baselinePriceOnOrAfter(series, baselineTs);
-    if (start == null || start <= 0) return null;
-    return ((end - start) / start) * 100;
-  }
-
+  // Normalize any payload to [{t: Date, p: number}] (ascending, deduped)
   function normalizeSeries(payload) {
     const arr = Array.isArray(payload) ? payload : (payload?.data ?? []);
     const out = [];
     for (const row of arr) {
-      let tIso = null, p = null;
+      let iso = null, p = null;
       if (row.t != null) {
-        tIso = typeof row.t === "string" ? row.t : new Date(row.t * 1000).toISOString();
-        p = row.p ?? row.c ?? row.close ?? row.price;
+        iso = typeof row.t === "string" ? row.t : new Date(row.t * 1000).toISOString();
+        p   = row.p ?? row.c ?? row.close ?? row.price;
       } else if (row.time != null) {
-        tIso = typeof row.time === "string" ? row.time : new Date(row.time * 1000).toISOString();
-        p = row.close ?? row.c ?? row.p ?? row.price;
+        iso = typeof row.time === "string" ? row.time : new Date(row.time * 1000).toISOString();
+        p   = row.close ?? row.c ?? row.p ?? row.price;
       } else if (row.timestamp != null) {
-        tIso = typeof row.timestamp === "string" ? row.timestamp : new Date(row.timestamp * 1000).toISOString();
-        p = row.close ?? row.c ?? row.p ?? row.price;
+        iso = typeof row.timestamp === "string" ? row.timestamp : new Date(row.timestamp * 1000).toISOString();
+        p   = row.close ?? row.c ?? row.p ?? row.price;
       }
-      if (tIso != null && p != null && !Number.isNaN(+p)) {
-        out.push({ t: new Date(tIso), p: +p });
-      }
+      if (iso && p != null && !Number.isNaN(+p)) out.push({ t: new Date(iso), p: +p });
     }
-    out.sort((a, b) => a.t - b.t);
-    // dedupe exact-timestamp dupes
+    out.sort((a,b) => a.t - b.t);
+    // dedupe identical timestamps
     const dedup = [];
     for (const d of out) {
-      if (!dedup.length || dedup[dedup.length - 1].t.getTime() !== d.t.getTime()) dedup.push(d);
-      else dedup[dedup.length - 1] = d;
+      if (!dedup.length || dedup[dedup.length-1].t.getTime() !== d.t.getTime()) dedup.push(d);
+      else dedup[dedup.length-1] = d;
     }
     return dedup;
+  }
+
+  // Compute % change table value using range definition
+  function computePctChange(series, range, nowUTC = new Date()) {
+    if (!series?.length) return null;
+    const end = series.at(-1)?.p;
+    if (end == null) return null;
+
+    let baselineTs;
+    if (range === "24H") {
+      baselineTs = new Date(floorHourUTC(nowUTC).getTime() - 24 * MS_HOUR).getTime();
+    } else if (range === "YTD") {
+      const y = nowUTC.getUTCFullYear();
+      baselineTs = Date.UTC(y, 0, 1);
+    } else {
+      const d0 = startOfDayUTC(nowUTC);
+      const back = { "1W":7, "1M":30, "3M":90 }[range] ?? 30;
+      baselineTs = new Date(d0.getTime() - back * MS_DAY).getTime();
+    }
+
+    // first price ON or AFTER the baseline; if baseline precedes the series, use earliest price
+    let lo = 0, hi = series.length - 1, ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (series[mid].t.getTime() >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
+    }
+    const start = (ans !== -1) ? series[ans].p : series[0].p;
+    if (start == null || start <= 0) return null;
+    return ((end - start) / start) * 100;
   }
 
   function formatNumber(x) {
     if (x >= 1) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
     return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
   }
+  function colorFor(sym) { let h=0; for (let i=0;i<sym.length;i++) h=(h*31+sym.charCodeAt(i))>>>0; return `hsl(${h%360} 70% 45%)`; }
 
-  // deterministic color per symbol
-  function colorFor(sym) {
-    let h = 0; for (let i=0;i<sym.length;i++) h = (h*31 + sym.charCodeAt(i)) >>> 0;
-    return `hsl(${h%360} 70% 45%)`;
-  }
-
-  // ---- Relative chart state ----
+  // --------- Relative chart state/UI ---------
   const rel = {
-    selected: new Set(["BTC","ETH","SOL","PUMP","HYPE","SPY","QQQ"]), // defaults
+    selected: new Set(["HYPE","SOL","ETH","BTC","PUMP"]), // defaults (shown if present)
     chart: null,
   };
 
-  // ---- UI builders ----
   function buildPicker() {
     const box = document.getElementById("relperf-picker");
     if (!box || !state.assetsIndex) return;
-
     box.innerHTML = "";
     state.assetsIndex.assets.forEach(a => {
       const btn = document.createElement("button");
       btn.className = "asset-btn" + (rel.selected.has(a.symbol) ? " on" : "");
       btn.textContent = a.name || a.symbol;
       btn.dataset.symbol = a.symbol;
-      btn.title = a.symbol;
       btn.addEventListener("click", () => {
         const s = btn.dataset.symbol;
         if (rel.selected.has(s)) { rel.selected.delete(s); btn.classList.remove("on"); }
@@ -504,82 +535,71 @@ window.__charts = {};
     });
   }
 
-  async function fetchJSON(path) {
-    const res = await fetch(path, { cache: "no-store" });
-    if (!res.ok) throw new Error(`${path} ${res.status}`);
-    return res.json();
-  }
-
-  // pick hourly file for 24H if available (either assets.json has path1h, or infer *_1h.json)
-  function hourlyPathOf(a) {
-    if (a.path1h) return a.path1h;
-    if (typeof a.path === "string" && a.path.endsWith(".json")) {
-      return a.path.replace(/\.json$/i, "_1h.json");
-    }
-    return `${a.path}_1h.json`;
-  }
-
-  async function ensureSeries(cacheKey, path) {
-    let s = state.cache.get(cacheKey);
+  async function ensureSeries(symbol, path) {
+    let s = state.cache.get(symbol);
     if (!s) {
-      const raw = await fetchJSON(path);
+      const res = await fetch(path, { cache: "no-store" });
+      const raw = await res.json();
       s = normalizeSeries(raw);
-      state.cache.set(cacheKey, s);
+      state.cache.set(symbol, s);
     }
     return s;
   }
 
-  async function ensureSeriesForRange(a) {
-    if (state.range === "24H") {
-      // try hourly, fall back to daily
-      const key = `${a.symbol}:1h`;
-      try {
-        return await ensureSeries(key, hourlyPathOf(a));
-      } catch {
-        return await ensureSeries(a.symbol, a.path);
-      }
+  // Build {x,y}% points by sampling *hourly* for 24H and *daily* otherwise.
+  function buildRelativePoints(series, boundaries) {
+    if (!series?.length || !boundaries.length) return [];
+
+    // baseline = first boundary price (last known on/<= boundary)
+    const baselinePx = latestOnOrBeforeTs(series, boundaries[0].getTime()) ?? series[0].p;
+    if (!(baselinePx > 0)) return [];
+
+    const pts = [];
+    for (const t of boundaries) {
+      const px = latestOnOrBeforeTs(series, t.getTime());
+      if (px == null) continue; // skip if nothing yet
+      const ret = ((px / baselinePx) - 1) * 100;
+      pts.push({ x: t, y: ret });
     }
-    return await ensureSeries(a.symbol, a.path);
+    return pts;
   }
 
   async function updateRelPerfChart() {
     const canvas = document.getElementById("relperf-chart");
     if (!canvas || !state.assetsIndex) return;
 
-    const baselineTs = makeBaselineStartTs(state.range, new Date());
+    const now = new Date();
+    const boundaries = buildBoundaries(state.range, now);
 
     const datasets = [];
     for (const a of state.assetsIndex.assets) {
       if (!rel.selected.has(a.symbol)) continue;
-      let series;
-      try {
-        series = await ensureSeriesForRange(a);
-      } catch (e) {
-        console.error("series load failed:", a.symbol, e);
-        continue;
-      }
-      if (!series.length) continue;
-
-      const startPx = baselinePriceOnOrAfter(series, baselineTs);
-      if (startPx == null || startPx <= 0) continue;
-
-      const rows = series.filter(pt => pt.t.getTime() >= baselineTs);
-      const points = rows.map(pt => ({ x: pt.t, y: ((pt.p / startPx) - 1) * 100 }));
+      const series = await ensureSeries(a.symbol, a.path);
+      const points = buildRelativePoints(series, boundaries);
+      if (!points.length) continue;
 
       datasets.push({
         label: a.name || a.symbol,
-        data: points,
+        data: points,            // [{x: Date, y: number}]
         borderColor: colorFor(a.symbol),
         backgroundColor: "transparent",
         pointRadius: 0,
         borderWidth: 2,
         tension: 0.2,
-        parsing: false
+        parsing: true            // we use {x,y}, Chart.js will parse these keys
       });
     }
 
+    // Create or update chart
     const ctx = canvas.getContext("2d");
-    const timeUnit = (state.range === "24H" ? "hour" : "day");
+    const xUnit = (state.range === "24H") ? "hour" : "day";
+    const tooltipLabel = (ts) =>
+      new Date(ts).toLocaleString(undefined, {
+        timeZone: "America/New_York",
+        month: "short", day: "numeric",
+        hour: xUnit === "hour" ? "numeric" : undefined,
+        minute: xUnit === "hour" ? "2-digit" : undefined
+      });
 
     if (!rel.chart) {
       rel.chart = new Chart(ctx, {
@@ -587,63 +607,48 @@ window.__charts = {};
         data: { datasets },
         options: {
           responsive: true,
-          // SHOW ALL SERIES AT HOVERED X
-          interaction: { mode: "index", intersect: false, axis: "x" },
-          hover: { mode: "index", intersect: false },
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false }, // shared tooltip
           plugins: {
             legend: { position: "top" },
             tooltip: {
-              itemSort: (a, b) => (b.parsed?.y ?? 0) - (a.parsed?.y ?? 0),
               callbacks: {
-                title: (items) => {
-                  const raw = items[0].parsed?.x ?? items[0].raw?.x ?? items[0].label;
-                  const d = raw instanceof Date ? raw : new Date(raw);
-                  return fmtET(d, {
-                    year: "numeric", month: "short", day: "numeric",
-                    hour: "numeric", minute: "2-digit"
-                  }) + " ET";
-                },
-                label: (c) => {
-                  const v = c.parsed.y;
-                  const sign = v >= 0 ? "+" : "";
-                  return `${c.dataset.label}: ${sign}${(v ?? 0).toFixed(2)}%`;
-                }
+                title: (items) => items?.length ? tooltipLabel(items[0].parsed.x) : "",
+                label: (c) => `${c.dataset.label}: ${(c.parsed.y >= 0 ? "+" : "")}${c.parsed.y.toFixed(2)}%`,
               }
-            },
-            subtitle: {
-              display: true,
-              text: "Times shown in Eastern Time (ET)",
-              align: "end",
-              padding: { top: 6 }
             }
           },
           scales: {
             x: {
               type: "time",
-              time: { unit: timeUnit },
+              time: { unit: xUnit },
               ticks: {
-                callback: (value) => {
-                  const d = new Date(+value);
-                  if (timeUnit === "hour") return fmtET(d, { hour: "numeric" });
-                  return fmtET(d, { month: "short", day: "numeric" });
+                callback: (v) => {
+                  const d = new Date(v);
+                  return d.toLocaleString(undefined, {
+                    timeZone: "America/New_York",
+                    month: (xUnit === "day") ? "short" : undefined,
+                    day:   (xUnit === "day") ? "numeric" : undefined,
+                    hour:  (xUnit === "hour") ? "numeric" : undefined
+                  });
                 }
               }
             },
             y: {
               ticks: { callback: v => `${v.toFixed(0)}%` },
-              grid: { color: (ctx) => ctx.tick.value === 0 ? "#999" : "rgba(0,0,0,.06)" }
+              grid: { color: c => (c.tick.value === 0 ? "#888" : "rgba(0,0,0,.08)") }
             }
           }
         }
       });
     } else {
       rel.chart.data.datasets = datasets;
-      rel.chart.options.scales.x.time.unit = timeUnit;
+      rel.chart.options.scales.x.time.unit = xUnit;
       rel.chart.update();
     }
   }
 
-  // ---- table rendering ----
+  // --------- Table rendering (unchanged except it uses the same range) ---------
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -653,12 +658,17 @@ window.__charts = {};
     const now = new Date();
 
     for (const a of state.assetsIndex.assets) {
-      let series;
-      try {
-        series = await ensureSeriesForRange(a);
-      } catch (e) {
-        console.error("Performance load failed:", a.symbol, e);
-        continue;
+      let series = state.cache.get(a.symbol);
+      if (!series) {
+        try {
+          const res = await fetch(a.path, { cache: "no-store" });
+          const raw = await res.json();
+          series = normalizeSeries(raw);
+          state.cache.set(a.symbol, series);
+        } catch (e) {
+          console.error("Performance load failed:", a.symbol, e);
+          continue;
+        }
       }
       if (!series.length) continue;
 
@@ -694,28 +704,31 @@ window.__charts = {};
     }
   }
 
-  // ---- init & wiring ----
+  // --------- init & wiring ---------
   async function init() {
+    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
-    // delegated click handler for ALL performance range buttons on the pane
+    // range buttons (ONLY inside the performance pane)
     document.addEventListener("click", (e) => {
       const btn = e.target.closest('#pane-performance .rng[data-range]');
       if (!btn) return;
-      const group = btn.closest(".range-switch") || document;
-      group.querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
+      (btn.closest(".range-switch") || document)
+        .querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
       state.range = btn.dataset.range;
       renderTable();
       updateRelPerfChart();
     });
 
+    // selector chips
     buildPicker();
+
     await renderTable();
     await updateRelPerfChart();
   }
 
-  // bootstrapping
+  // lazy init when the tab is opened; init immediately if already active
   document.addEventListener("DOMContentLoaded", () => {
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
@@ -735,5 +748,6 @@ window.__charts = {};
     }
   });
 })();
+
 
 
