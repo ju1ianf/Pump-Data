@@ -4,6 +4,7 @@
     { "symbol": "SOL",    "name": "SOL",    "path": "data/perf/SOL.json" },
     { "symbol": "ETH",    "name": "ETH",    "path": "data/perf/ETH.json" },
     { "symbol": "BTC",    "name": "BTC",    "path": "data/perf/BTC.json" },
+    { "symbol": "XAUT",   "name": "XAUT",   "path": "data/perf/XAUT.json" },
     { "symbol": "PUMP",   "name": "PUMP",   "path": "data/perf/PUMP.json" },
     { "symbol": "BERA",   "name": "BERA",   "path": "data/perf/BERA.json" },
     { "symbol": "IP",     "name": "IP",     "path": "data/perf/IP.json" },
