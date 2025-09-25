@@ -392,12 +392,12 @@ window.__charts = {};
     statsId: "stats-chart-bb"
   });
 
-  // 4) Cumulative Buybacks vs Circulating Market Cap
+  // 4) PUMP Cumulative Buybacks vs Market Cap
   window.__charts.bbmcap = await makeBuybacksVsMcap({
     el: "chart-bbmcap",
-    file: "data/pump_buybacks_vs_mcap.json",
+    file: "data/pump_mcap_buybacks.json",
     statsId: "stats-chart-bbmcap"
   });
-})();
+
 
 
