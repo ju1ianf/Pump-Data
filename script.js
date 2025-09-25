@@ -92,8 +92,26 @@ async function makeDualAxis({
   leftColor = OTHER_COLOR, rightColor = PRICE_COLOR,
   statsId
 }) {
-  const res = await fetch(file, { cache: "no-store" });
-  const { series } = await res.json();
+  let series = [];
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    series = Array.isArray(json?.series) ? json.series : [];
+    if (!series.length) throw new Error("Empty or missing 'series' array");
+  } catch (err) {
+    console.error(`Failed to load ${file}:`, err);
+    const canvas = document.getElementById(el);
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "#777";
+      ctx.font = "16px Libre Baskerville, Georgia, serif";
+      ctx.fillText("Data unavailable", 12, 24);
+    }
+    // still return structure so callers don't crash
+    return { chart: null, series: [] };
+  }
 
   // one-time stats render (full history)
   renderStatsBox(statsId, series, leftKey, rightKey);
@@ -194,8 +212,25 @@ function fmtPctAxis(v) {
 }
 
 async function makeBuybacksVsMcap({ el, file, statsId }) {
-  const res = await fetch(file, { cache: "no-store" });
-  const { series } = await res.json();
+  let series = [];
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    series = Array.isArray(json?.series) ? json.series : [];
+    if (!series.length) throw new Error("Empty or missing 'series' array");
+  } catch (err) {
+    console.error(`Failed to load ${file}:`, err);
+    const canvas = document.getElementById(el);
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "#777";
+      ctx.font = "16px Libre Baskerville, Georgia, serif";
+      ctx.fillText("Data unavailable", 12, 24);
+    }
+    return { chart: null, series: [] };
+  }
 
   // ---- stats box: share retired + changes for buybacks & mcap ----
   (function renderStats() {
