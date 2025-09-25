@@ -574,90 +574,90 @@ window.__charts = {};
   }
 
   async function updateRelPerfChart() {
-  const canvas = document.getElementById("relperf-chart");
-  if (!canvas || !state.assetsIndex) return;
+    const canvas = document.getElementById("relperf-chart");
+    if (!canvas || !state.assetsIndex) return;
 
-  const now = new Date();
-  const boundaries = buildBoundaries(state.range, now);
+    const now = new Date();
+    theBoundaries = buildBoundaries(state.range, now); // define local correctly
+    const boundaries = theBoundaries;
 
-  const datasets = [];
-  for (const a of state.assetsIndex.assets) {
-    if (!rel.selected.has(a.symbol)) continue;
-    const series = await ensureSeries(a.symbol, a.path);
-    const points = buildRelativePoints(series, boundaries);
-    if (!points.length) continue;
+    const datasets = [];
+    for (const a of state.assetsIndex.assets) {
+      if (!rel.selected.has(a.symbol)) continue;
+      const series = await ensureSeries(a.symbol, a.path);
+      const points = buildRelativePoints(series, boundaries);
+      if (!points.length) continue;
 
-    datasets.push({
-      label: a.name || a.symbol,
-      data: points,                   // [{ x: Date, y: number }]
-      borderColor: colorFor(a.symbol),
-      backgroundColor: "transparent",
-      pointRadius: 0,
-      borderWidth: 2,
-      tension: 0.2,
-      parsing: true,                  // use x/y keys
-      spanGaps: true                  // don’t break on missing hours/days
-    });
-  }
+      datasets.push({
+        label: a.name || a.symbol,
+        data: points,                   // [{ x: Date, y: number }]
+        borderColor: colorFor(a.symbol),
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.2,
+        parsing: true,                  // use x/y keys
+        spanGaps: true                  // don’t break on missing hours/days
+      });
+    }
 
-  // Create or update chart
-  const ctx = canvas.getContext("2d");
-  const xUnit = (state.range === "24H") ? "hour" : "day";
-  const tooltipTitle = (ts) =>
-    new Date(ts).toLocaleString(undefined, {
-      timeZone: ET_TZ,                // "America/New_York"
-      month: "short", day: "numeric",
-      hour: xUnit === "hour" ? "numeric" : undefined,
-      minute: xUnit === "hour" ? "2-digit" : undefined
-    });
+    // Create or update chart
+    const ctx = canvas.getContext("2d");
+    const xUnit = (state.range === "24H") ? "hour" : "day";
+    const tooltipTitle = (ts) =>
+      new Date(ts).toLocaleString(undefined, {
+        timeZone: ET_TZ,                // "America/New_York"
+        month: "short", day: "numeric",
+        hour: xUnit === "hour" ? "numeric" : undefined,
+        minute: xUnit === "hour" ? "2-digit" : undefined
+      });
 
-  if (!rel.chart) {
-    rel.chart = new Chart(ctx, {
-      type: "line",
-      data: { datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,   // key: lets the fixed-height wrapper control size
-        interaction: { mode: "index", intersect: false }, // shared tooltip
-        plugins: {
-          legend: { position: "top" },
-          tooltip: {
-            callbacks: {
-              title: (items) => items?.length ? tooltipTitle(items[0].parsed.x) : "",
-              label: (c) => `${c.dataset.label}: ${(c.parsed.y >= 0 ? "+" : "")}${c.parsed.y.toFixed(2)}%`,
-            }
-          }
-        },
-        scales: {
-          x: {
-            type: "time",
-            time: { unit: xUnit },
-            ticks: {
-              callback: (v) => {
-                const d = new Date(v);
-                return d.toLocaleString(undefined, {
-                  timeZone: ET_TZ,
-                  month: (xUnit === "day") ? "short" : undefined,
-                  day:   (xUnit === "day") ? "numeric" : undefined,
-                  hour:  (xUnit === "hour") ? "numeric" : undefined
-                });
+    if (!rel.chart) {
+      rel.chart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,   // lets the fixed-height wrapper control size
+          interaction: { mode: "index", intersect: false }, // shared tooltip
+          plugins: {
+            legend: { position: "top" },
+            tooltip: {
+              callbacks: {
+                title: (items) => items?.length ? tooltipTitle(items[0].parsed.x) : "",
+                label: (c) => `${c.dataset.label}: ${(c.parsed.y >= 0 ? "+" : "")}${c.parsed.y.toFixed(2)}%`,
               }
             }
           },
-          y: {
-            ticks: { callback: v => `${v.toFixed(0)}%` },
-            grid: { color: ctx => (ctx.tick.value === 0 ? "#888" : "rgba(0,0,0,.08)") }
+          scales: {
+            x: {
+              type: "time",
+              time: { unit: xUnit },
+              ticks: {
+                callback: (v) => {
+                  const d = new Date(v);
+                  return d.toLocaleString(undefined, {
+                    timeZone: ET_TZ,
+                    month: (xUnit === "day") ? "short" : undefined,
+                    day:   (xUnit === "day") ? "numeric" : undefined,
+                    hour:  (xUnit === "hour") ? "numeric" : undefined
+                  });
+                }
+              }
+            },
+            y: {
+              ticks: { callback: v => `${v.toFixed(0)}%` },
+              grid: { color: ctx => (ctx.tick.value === 0 ? "#888" : "rgba(0,0,0,.08)") }
+            }
           }
         }
-      }
-    });
-  } else {
-    rel.chart.data.datasets = datasets;
-    rel.chart.options.scales.x.time.unit = xUnit;
-    rel.chart.update();
+      });
+    } else {
+      rel.chart.data.datasets = datasets;
+      rel.chart.options.scales.x.time.unit = xUnit;
+      rel.chart.update();
+    }
   }
-}
-
 
   // --------- Table rendering ---------
   async function renderTable() {
@@ -759,7 +759,6 @@ window.__charts = {};
     }
   });
 })();
-
 
 
 
