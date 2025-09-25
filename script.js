@@ -48,7 +48,7 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const R_w   = latestOnOrBefore(rows, rightKey, d7);
   const R_m   = latestOnOrBefore(rows, rightKey, d30);
 
-  const map = { price:"Price", fees:"Fees", revenue:"Revenue", buybacks_usd:"Buybacks" };
+  const map = { price:"Price", fees:"Fees", revenue:"Revenue", buybacks:"Buybacks" };
 
   el.innerHTML = `
     <div class="stat-card">
@@ -87,7 +87,6 @@ async function makeDualAxis({
     const { series } = await res.json();
     if (!Array.isArray(series)) throw new Error(`${file} bad shape`);
 
-    // Stats
     if (statsId) renderStatsBox(statsId, series, leftKey, rightKey);
 
     const labels = series.map(d => d.date);
@@ -207,20 +206,18 @@ window.__charts = {};
     statsId: "stats-chart-rev"
   });
 
-  // 3) Price vs Buybacks (USD)
+  // 3) Price vs Buybacks  (now using plain "buybacks")
   window.__charts.priceBuybacks = await makeDualAxis({
     el: "chart-buybacks",
-    file: "data/pump_price_buybacks_usd.json",
-    leftKey: "buybacks_usd",
+    file: "data/pump_buybacks.json",   // <-- expects { date, price, buybacks }
+    leftKey: "buybacks",
     rightKey: "price",
-    leftLabel: "Buybacks (USD)",
+    leftLabel: "Buybacks",
     rightLabel: "Price (USD)",
     statsId: "stats-chart-bb"
   });
 
-  // NOTE: The new “Cumulative Buybacks vs Mcap” chart uses a *different*
-  // file (data/pump_buybacks_vs_mcap.json) and a custom function.
-  // If you haven’t generated that file yet, the rest will still render.
-  // When it’s ready, we can plug it back in here.
+  // (Your separate “Cumulative Buybacks vs Market Cap” chart stays in its own builder)
 })();
+
 
