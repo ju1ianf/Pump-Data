@@ -202,114 +202,84 @@ with open("data/pump_price_buybacks_usd.json", "w") as f:
 print("wrote data/pump_price_buybacks_usd.json rows:", len(df_pbb))
 
 
-# --------------- 4) Cum. Buybacks vs Market Cap ----------------
-# Build a base frame with price & buybacks_native again (to keep consistent alignment)
-df_price_bb = to_df_vals(sym_bb.get("price", []), "price")
-df_bb_native2 = to_df_vals(sym_bb.get("buybacks_native", []), "buybacks_native").sort_values("date").reset_index(drop=True)
-df_bb_native2["buybacks_native"] = df_bb_native2["buybacks_native"].ffill()
-
-df_core = (
-    pd.merge(df_price_bb, df_bb_native2, on="date", how="outer")
-    .sort_values("date")
-    .reset_index(drop=True)
+# ---------- 4) PUMP: Cumulative Buybacks (USD) vs Market Cap ----------
+resp_bb = API.fetch_metrics(
+    metric_names="buybacks",
+    symbols=ASSET,
+    start_date=START,
+    end_date=END,
 )
-df_core["buybacks_usd_raw"] = df_core["buybacks_native"] * df_core["price"]
-df_core["cum_buybacks_usd"] = ensure_cumulative(df_core["buybacks_usd_raw"])
+sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
+df_bb = to_df_vals(sym_bb.get("buybacks", []), "buybacks_usd")
 
-# Find a usable Market Cap or Circulating Supply (to compute price * supply)
-MCAP_ALIASES   = {"cmc", "circulatingmarketcap", "marketcap", "mc",
-                  "circulatingmarketcapusd", "marketcapusd"}
-SUPPLY_ALIASES = {"circulatingsupply", "supplycirculating", "supply"}
+# Cumulative buybacks directly
+df_bb["cum_buybacks_usd"] = df_bb["buybacks_usd"].fillna(0).cumsum()
 
-sym_mc, used_mcap_key, used_kind = None, None, None
-probes = [
-    "price,cmc",
-    "price,CMC",
-    "price,mc",
-    "price,MC",
-    "price,market_cap",
-    "price,marketcap",
-    "price,circulating_market_cap",
-    "price,circulating_market_cap_usd",
-    "price,marketcap_usd",
-    "price,circulating_supply",
-    "price,supply_circulating",
-    "price,supply",
-    "price,*",  # last resort
+# --- Market Cap fetch ---
+mcap_candidates = [
+    "MC", "mc", "CMC", "cmc",
+    "market_cap", "marketcap_usd", "marketcap",
+    "circulating_market_cap", "circulating_market_cap_usd",
+    "circulating_marketcap", "circ_market_cap",
 ]
+supply_candidates = ["circulating_supply", "supply_circulating", "supply"]
 
-for names in probes:
+sym_mc, used_key = None, None
+for names in [
+    "price,MC", "price,CMC", "price,market_cap", "price,marketcap_usd",
+    "price,circulating_market_cap", "price,circulating_supply", "price,*"
+]:
     try:
-        block = fetch_block(names)
-        d = block["data"]["symbols"][ASSET]
-
-        # Prefer direct market-cap fields
-        found = None
-        for k in d.keys():
-            nk = _norm(k)
-            if nk in MCAP_ALIASES or k in {"CMC", "MC", "Market Cap", "Circulating Market Cap"}:
-                found = k
-                break
-        if found is not None:
-            sym_mc, used_mcap_key, used_kind = d, found, "mcap"
-            break
-
-        # Else try supply-based fields
-        for k in d.keys():
-            if _norm(k) in SUPPLY_ALIASES:
-                sym_mc, used_mcap_key, used_kind = d, k, "supply"
-                break
-        if sym_mc is not None:
-            break
+        block = API.fetch_metrics(metric_names=names, symbols=ASSET, start_date=START, end_date=END)
+        d = (block.model_dump() if hasattr(block, "model_dump") else block.__dict__)["data"]["symbols"][ASSET]
+        for k in mcap_candidates:
+            if k in d:
+                sym_mc, used_key = d, k; break
+        if sym_mc: break
+        for k in supply_candidates:
+            if k in d:
+                sym_mc, used_key = d, k; break
+        if sym_mc: break
     except Exception:
         continue
 
-# Always ensure the column exists
-if "mcap_usd" not in df_core.columns:
-    df_core["mcap_usd"] = pd.NA
+df_core = df_bb.copy()
 
-# Populate mcap_usd using what we found
-if sym_mc is not None and used_kind == "mcap":
-    df_mcap = to_df_vals(sym_mc.get(used_mcap_key, []), "mcap_usd")
-    df_core = (
-        pd.merge(df_core, df_mcap, on="date", how="outer")
-        .sort_values("date")
-        .reset_index(drop=True)
-    )
-elif sym_mc is not None and used_kind == "supply":
-    df_sup = to_df_vals(sym_mc.get(used_mcap_key, []), "circ_supply")
-    df_core = (
-        pd.merge(df_core, df_sup, on="date", how="outer")
-        .sort_values("date")
-        .reset_index(drop=True)
-    )
+if sym_mc and used_key in mcap_candidates:
+    df_mcap = to_df_vals(sym_mc.get(used_key, []), "mcap_usd")
+    df_core = pd.merge(df_core, df_mcap, on="date", how="outer").sort_values("date").reset_index(drop=True)
+elif sym_mc and used_key in supply_candidates:
+    df_sup = to_df_vals(sym_mc.get(used_key, []), "circ_supply")
+    df_core = pd.merge(df_core, df_sup, on="date", how="outer").sort_values("date").reset_index(drop=True)
     df_core["mcap_usd"] = df_core["price"] * df_core["circ_supply"]
 else:
-    # Debug: print keys to help diagnose if nothing matched
-    try:
-        peek = fetch_block("price,*")["data"]["symbols"][ASSET]
-        print("WARN: No mcap/supply key matched. Sample keys:", list(peek.keys()))
-    except Exception:
-        print("WARN: No mcap/supply key matched and peek failed.")
+    print("WARN: Could not find market cap metric. Only buybacks will be available.")
 
-# % of circulating value retired (proxy)
-df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
+# % supply retired (proxy)
+if "mcap_usd" in df_core:
+    df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
 
-out_bbmcap = "data/pump_buybacks_vs_mcap.json"
-with open(out_bbmcap, "w") as f:
+# Write file
+out_file = "data/pump_mcap_buybacks.json"
+os.makedirs("data", exist_ok=True)
+with open(out_file, "w") as f:
     json.dump({
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
-                "cum_buybacks_usd": None if pd.isna(bu) else float(bu),
-                "mcap_usd": None if pd.isna(mc) else float(mc),
-                "pct_bought": None if pd.isna(pb) else float(pb),
+                "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
+                "mcap_usd":         None if pd.isna(mc) else float(mc),
+                "pct_bought":       None if pd.isna(pb) else float(pb),
             }
-            for d, bu, mc, pb in zip(
-                df_core["date"], df_core["cum_buybacks_usd"], df_core["mcap_usd"], df_core["pct_bought"]
+            for d, cb, mc, pb in zip(
+                df_core["date"],
+                df_core["cum_buybacks_usd"],
+                df_core.get("mcap_usd", [pd.NA]*len(df_core)),
+                df_core.get("pct_bought", [pd.NA]*len(df_core)),
             )
         ]
     }, f, indent=2)
-print(f"wrote {out_bbmcap} rows:", len(df_core))
+
+print("wrote", out_file, "rows:", len(df_core))
 
 
