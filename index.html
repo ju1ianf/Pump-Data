@@ -137,6 +137,17 @@
     /* Tab panes */
     .tabpane{display:none;}
     .tabpane.active{display:block;}
+
+    /* ===== Performance tab styles ===== */
+    #panel-performance .panel-header { display:flex; justify-content:space-between; align-items:center; margin:12px 0; }
+    #panel-performance .range-switch { display:flex; gap:8px; }
+    #panel-performance .rng { padding:6px 10px; border:1px solid #ddd; border-radius:18px; background:#fff; cursor:pointer; font:600 13px/1 var(--body-font); }
+    #panel-performance .rng.active { background:#111; color:#fff; border-color:#111; }
+    #perf-table { width:100%; border-collapse:collapse; }
+    #perf-table th, #perf-table td { padding:10px 8px; border-bottom:1px solid #eee; }
+    #perf-table th { text-align:left; }
+    #perf-table td:nth-child(2), #perf-table td:nth-child(3) { text-align:right; }
+    #perf-table tbody tr { cursor:pointer; }
   </style>
 </head>
 <body>
@@ -153,6 +164,8 @@
       <a href="#dats">DATs</a>
       <a href="#hype">HYPE</a>
       <a href="#risk">Risk</a>
+      <!-- NEW: Performance tab (also given an id for the JS initializer in script.js) -->
+      <a href="#performance" id="tab-performance" class="tab">Performance</a>
     </nav>
 
     <!-- Pump tab -->
@@ -202,7 +215,7 @@
         <aside class="statbox" id="stats-chart-bb"></aside>
       </div>
 
-      <!-- NEW: Cumulative Buybacks vs Circulating Market Cap -->
+      <!-- Cumulative Buybacks vs Circulating Market Cap -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
@@ -235,6 +248,33 @@
       <h2>Risk (placeholder)</h2>
       <p>XYZ.</p>
     </section>
+
+    <!-- NEW: Performance tab pane (ids match the JS you added) -->
+    <section id="panel-performance" class="tabpane">
+      <div class="panel-header">
+        <h2>Performance</h2>
+        <div class="range-switch">
+          <button class="rng" data-range="24H">24H</button>
+          <button class="rng" data-range="1W">1W</button>
+          <button class="rng active" data-range="1M">1M</button>
+          <button class="rng" data-range="3M">3M</button>
+          <button class="rng" data-range="YTD">YTD</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="perf-table">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th>Price</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
   <!-- Tab router -->
@@ -246,6 +286,8 @@
         dats: document.getElementById('pane-dats'),
         hype: document.getElementById('pane-hype'),
         risk: document.getElementById('pane-risk'),
+        // NEW: wire the Performance pane into the router
+        performance: document.getElementById('panel-performance'),
       };
       function activate(name) {
         const target = name.toLowerCase();
@@ -256,6 +298,14 @@
         Object.entries(panes).forEach(([k, el]) => el.classList.toggle('active', k === target));
         if (target === 'pump' && window.__charts) {
           Object.values(window.__charts).forEach(obj => obj?.chart?.resize?.());
+        }
+        // Lazy-init the Performance tab the first time it's shown by triggering a click on its tab anchor.
+        if (target === 'performance') {
+          const perfTab = document.getElementById('tab-performance');
+          if (perfTab && !perfTab.__initFired) {
+            perfTab.__initFired = true;
+            perfTab.dispatchEvent(new Event('click')); // this is caught by script.js Performance initializer
+          }
         }
       }
       function fromHash() {
@@ -271,9 +321,10 @@
     })();
   </script>
 
-  <!-- Charts + stats logic -->
+  <!-- Charts + stats logic (includes the Performance tab JS you added) -->
   <script src="script.js"></script>
 </body>
 </html>
+
 
 
