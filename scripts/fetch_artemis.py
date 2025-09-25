@@ -203,76 +203,50 @@ print("wrote data/pump_price_buybacks_usd.json rows:", len(df_pbb))
 
 
 # ---------- 4) PUMP: Cumulative Buybacks (USD) vs Market Cap ----------
-resp_bb = API.fetch_metrics(
-    metric_names="buybacks",
+
+resp = API.fetch_metrics(
+    metric_names="mc,buybacks",       # exactly the two you need
     symbols=ASSET,
     start_date=START,
     end_date=END,
 )
-sym_bb = (resp_bb.model_dump() if hasattr(resp_bb, "model_dump") else resp_bb.__dict__)["data"]["symbols"][ASSET]
-df_bb = to_df_vals(sym.get("buybacks", []), "buybacks")
+sym = (resp.model_dump() if hasattr(resp, "model_dump") else resp.__dict__)["data"]["symbols"][ASSET]
 
-# Cumulative buybacks directly
-df_bb["cum_buybacks_usd"] = df_bb["buybacks_usd"].fillna(0).cumsum()
+# Normalize to tidy dataframes
+df_mc  = to_df_vals(sym.get("mc", []), "mcap_usd")
+df_bb  = to_df_vals(sym.get("buybacks", []), "buybacks_usd")  # treat as USD series
 
-# --- Market Cap fetch ---
-mcap_candidates = [
-    "MC", "mc", "CMC", "cmc",
-    "market_cap", "marketcap_usd", "marketcap",
-    "circulating_market_cap", "circulating_market_cap_usd",
-    "circulating_marketcap", "circ_market_cap",
-]
-supply_candidates = ["circulating_supply", "supply_circulating", "supply"]
+# Make sure buybacks are cumulative (if the metric is already cumulative, this is a no-op)
+df_bb["cum_buybacks_usd"] = ensure_cumulative(df_bb["buybacks_usd"])
 
-sym_mc, used_key = None, None
-for names in [
-    "price,MC", "price,CMC", "price,market_cap", "price,marketcap_usd",
-    "price,circulating_market_cap", "price,circulating_supply", "price,*"
-]:
-    try:
-        block = API.fetch_metrics(metric_names=names, symbols=ASSET, start_date=START, end_date=END)
-        d = (block.model_dump() if hasattr(block, "model_dump") else block.__dict__)["data"]["symbols"][ASSET]
-        for k in mcap_candidates:
-            if k in d:
-                sym_mc, used_key = d, k; break
-        if sym_mc: break
-        for k in supply_candidates:
-            if k in d:
-                sym_mc, used_key = d, k; break
-        if sym_mc: break
-    except Exception:
-        continue
+# Merge to a single frame for writing/plotting
+df_core = (
+    pd.merge(df_mc, df_bb[["date", "cum_buybacks_usd"]], on="date", how="outer")
+      .sort_values("date").reset_index(drop=True)
+)
 
-df_core = df_bb.copy()
+# Optional: forward-fill market cap if sparse
+df_core["mcap_usd"] = df_core["mcap_usd"].ffill()
 
-if sym_mc and used_key in mcap_candidates:
-    df_mcap = to_df_vals(sym_mc.get(used_key, []), "mcap_usd")
-    df_core = pd.merge(df_core, df_mcap, on="date", how="outer").sort_values("date").reset_index(drop=True)
-elif sym_mc and used_key in supply_candidates:
-    df_sup = to_df_vals(sym_mc.get(used_key, []), "circ_supply")
-    df_core = pd.merge(df_core, df_sup, on="date", how="outer").sort_values("date").reset_index(drop=True)
-    df_core["mcap_usd"] = df_core["price"] * df_core["circ_supply"]
-else:
-    print("WARN: Could not find market cap metric. Only buybacks will be available.")
-
-# % supply retired (proxy)
-if "mcap_usd" in df_core:
-    df_core["pct_bought"] = df_core["cum_buybacks_usd"] / df_core["mcap_usd"]
-
-# Write file
-out_file = "data/pump_buybacks.json"
+# Write JSON for the chart (cumulative buybacks on one axis, market cap on the other)
+out_file = "data/pump_buybacks_vs_mcap.json"
 with open(out_file, "w") as f:
     json.dump({
         "series": [
             {
                 "date": d.strftime("%Y-%m-%d"),
-                "price": None if pd.isna(p) else float(p),
-                "buybacks": None if pd.isna(b) else float(b),
+                "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
+                "mcap_usd": None if pd.isna(mc) else float(mc),
             }
-            for d, p, b in zip(df_price["date"], df_price["price"], df_bb["buybacks"])
+            for d, cb, mc in zip(
+                df_core["date"],
+                df_core["cum_buybacks_usd"],
+                df_core["mcap_usd"],
+            )
         ]
     }, f, indent=2)
 
 print("wrote", out_file, "rows:", len(df_core))
+
 
 
