@@ -143,6 +143,12 @@
     #perf-table th { text-align:left; }
     #perf-table td:nth-child(2), #perf-table td:nth-child(3) { text-align:right; }
     #perf-table tbody tr { cursor:pointer; }
+
+    /* NEW: relative performance picker + chart */
+    .asset-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px;max-height:112px;overflow:auto;}
+    .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
+    .asset-btn.on{background:#111;color:#fff;border-color:#111;}
+    #relperf-chart{height:380px;max-width:100%;background:#fff;}
   </style>
 </head>
 <body>
@@ -256,6 +262,12 @@
         </div>
       </div>
 
+      <!-- NEW: Relative performance block -->
+      <div class="relperf">
+        <div id="relperf-picker" class="asset-picker"></div>
+        <canvas id="relperf-chart"></canvas>
+      </div>
+
       <div class="table-wrap">
         <table id="perf-table">
           <thead>
@@ -317,6 +329,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
-
-
