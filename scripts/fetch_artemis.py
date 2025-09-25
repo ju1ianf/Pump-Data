@@ -191,11 +191,14 @@ df_supply  = to_df_vals(sym4.get("circ_supply", []), "circ_supply")
 df_bb4 = (df_bb_nat4.merge(df_price4, on="date", how="outer")
                     .sort_values("date").reset_index(drop=True))
 df_bb4["buybacks_usd"]      = (df_bb4["buybacks_native"] * df_bb4["price"]).astype("float")
-df_bb4                      = trim_from(df_bb4)                # trim first
+df_bb4                      = trim_from(df_bb4)
 df_bb4["cum_buybacks_usd"]  = ensure_cumulative(df_bb4["buybacks_usd"])
 
+# NEW: cumulative native (for “% of circulating supply” option)
+df_bb4["cum_buybacks_native"] = ensure_cumulative(df_bb4["buybacks_native"])
+
 # market cap: prefer mc; else price*circ_supply
-df_core = df_bb4[["date", "cum_buybacks_usd"]].copy()
+df_core = df_bb4[["date", "cum_buybacks_usd", "cum_buybacks_native"]].copy()
 if not df_mc_raw.empty:
     df_core = df_core.merge(trim_from(df_mc_raw), on="date", how="outer")
 else:
@@ -204,27 +207,47 @@ else:
 if not df_supply.empty:
     tmp = (df_price4.merge(df_supply, on="date", how="outer")
                      .sort_values("date").reset_index(drop=True))
-    tmp  = trim_from(tmp)  # keep the same cutoff
+    tmp  = trim_from(tmp)
     tmp["mcap_from_supply"] = (tmp["price"] * tmp["circ_supply"]).astype("float")
-    df_core = (df_core.merge(tmp[["date", "mcap_from_supply"]], on="date", how="outer")
+    df_core = (df_core.merge(tmp[["date", "mcap_from_supply", "circ_supply"]], on="date", how="outer")
                      .sort_values("date").reset_index(drop=True))
     df_core["mcap_usd"] = pd.to_numeric(df_core["mcap_usd"], errors="coerce")
     df_core["mcap_usd"] = df_core["mcap_usd"].fillna(df_core["mcap_from_supply"])
-    df_core = df_core.drop(columns=["mcap_from_supply"], errors="ignore")
+else:
+    df_core["circ_supply"] = pd.NA
 
-df_core = trim_from(df_core)  # final trim
+df_core = trim_from(df_core)
 df_core["mcap_usd"] = pd.to_numeric(df_core["mcap_usd"], errors="coerce").ffill()
+
+# ===== NEW METRICS =====
+# 1) Your requested proxy: % of market cap bought (rises with buybacks)
+df_core["pct_mcap_bought"] = (df_core["cum_buybacks_usd"] / df_core["mcap_usd"]).replace([float("inf")], pd.NA)
+
+# 2) Optional: % of circulating supply retired (requires native + supply)
+df_core["pct_circ_retired"] = (df_core["cum_buybacks_native"] / df_core["circ_supply"]).replace([float("inf")], pd.NA)
 
 with open("data/pump_buybacks_vs_mcap.json", "w") as f:
     json.dump({
         "series": [
-            {"date": d.strftime("%Y-%m-%d"),
-             "cum_buybacks_usd": None if pd.isna(cb) else float(cb),
-             "mcap_usd":         None if pd.isna(mc) else float(mc)}
-            for d, cb, mc in zip(df_core["date"], df_core["cum_buybacks_usd"], df_core["mcap_usd"])
+            {
+                "date": d.strftime("%Y-%m-%d"),
+                "cum_buybacks_usd": None if pd.isna(cb_usd) else float(cb_usd),
+                "mcap_usd":         None if pd.isna(mc)     else float(mc),
+                # NEW fields exposed to the frontend:
+                "pct_mcap_bought":  None if pd.isna(p1)     else float(p1),   # use this for your stat table
+                "pct_circ_retired": None if pd.isna(p2)     else float(p2),   # optional alternative
+            }
+            for d, cb_usd, mc, p1, p2 in zip(
+                df_core["date"],
+                df_core["cum_buybacks_usd"],
+                df_core["mcap_usd"],
+                df_core["pct_mcap_bought"],
+                df_core["pct_circ_retired"],
+            )
         ]
     }, f, indent=2)
 print("wrote data/pump_buybacks_vs_mcap.json rows:", len(df_core))
+
 
 
 
