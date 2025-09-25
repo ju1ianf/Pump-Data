@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 import pandas as pd
 from artemis import Artemis
+from pathlib import Path
 
 # ---------------- Config ----------------
 API   = Artemis(api_key=os.environ["ARTEMIS_API_KEY"])
@@ -13,11 +14,13 @@ ASSET = "pump"                           # use "pump" if that's how Artemis list
 START = "2025-07-17"                     # fixed start date
 END   = datetime.now(timezone.utc).date().isoformat()
 
+# output dirs
 os.makedirs("data", exist_ok=True)
+os.makedirs("data/perf", exist_ok=True)
 
 # ---------------- Helpers ----------------
 def to_df_vals(rows, colname):
-    """Artemis rows -> tidy df(date, <colname>). Handles common field names."""
+    """Artemis rows -> tidy df(date, <colname>). Handles common field names (daily-like; normalizes to date)."""
     if not rows:
         return pd.DataFrame(columns=["date", colname])
 
@@ -31,14 +34,14 @@ def to_df_vals(rows, colname):
 
     # value column
     if colname not in df.columns:
-        for k in ("v", "val", "value"):
+        for k in ("v", "val", "value", "close", "c", "p", "price"):
             if k in df.columns:
                 df = df.rename(columns={k: colname})
                 break
         if colname not in df.columns:
             df[colname] = pd.NA
 
-    # date column
+    # date column (normalize to midnight UTC for your existing PUMP charts)
     if "t" in df.columns:
         df["date"] = (
             pd.to_datetime(df["t"], unit="ms", errors="coerce")
@@ -59,6 +62,45 @@ def to_df_vals(rows, colname):
     df[colname] = pd.to_numeric(df[colname], errors="coerce")
     df = df.loc[~df["date"].isna(), ["date", colname]]
     return df.sort_values("date").reset_index(drop=True)
+
+def to_df_vals_ts(rows, colname):
+    """Like to_df_vals, but **keeps time** (no normalize). Used for the Performance tab (hourly is OK)."""
+    if not rows:
+        return pd.DataFrame(columns=["ts", colname])
+
+    if isinstance(rows, dict) and "rows" in rows and isinstance(rows["rows"], list):
+        rows = rows["rows"]
+
+    if not isinstance(rows, list) or (rows and not isinstance(rows[0], dict)):
+        return pd.DataFrame(columns=["ts", colname])
+
+    df = pd.DataFrame(rows)
+
+    # value column
+    if colname not in df.columns:
+        for k in ("p", "c", "close", "v", "val", "value", "price"):
+            if k in df.columns:
+                df = df.rename(columns={k: colname})
+                break
+        if colname not in df.columns:
+            df[colname] = pd.NA
+
+    # timestamp column (UTC, keep time)
+    if "t" in df.columns:
+        ts = pd.to_datetime(df["t"], unit="ms", errors="coerce", utc=True)
+    elif "timestamp" in df.columns:
+        ts = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+    elif "time" in df.columns:
+        ts = pd.to_datetime(df["time"], errors="coerce", utc=True)
+    elif "date" in df.columns:
+        ts = pd.to_datetime(df["date"], errors="coerce", utc=True)
+    else:
+        return pd.DataFrame(columns=["ts", colname])
+
+    df["ts"] = ts
+    df[colname] = pd.to_numeric(df[colname], errors="coerce")
+    df = df.loc[~df["ts"].isna(), ["ts", colname]]
+    return df.sort_values("ts").reset_index(drop=True)
 
 def ensure_cumulative(series: pd.Series) -> pd.Series:
     s = pd.to_numeric(series, errors="coerce")
@@ -210,7 +252,7 @@ if not df_supply.empty:
     tmp  = trim_from(tmp)
     tmp["mcap_from_supply"] = (tmp["price"] * tmp["circ_supply"]).astype("float")
     df_core = (df_core.merge(tmp[["date", "mcap_from_supply", "circ_supply"]], on="date", how="outer")
-                     .sort_values("date").reset_index(drop=True))
+                     .sort_values("date", ascending=True).reset_index(drop=True))
     df_core["mcap_usd"] = pd.to_numeric(df_core["mcap_usd"], errors="coerce")
     df_core["mcap_usd"] = df_core["mcap_usd"].fillna(df_core["mcap_from_supply"])
 else:
@@ -248,8 +290,53 @@ with open("data/pump_buybacks_vs_mcap.json", "w") as f:
     }, f, indent=2)
 print("wrote data/pump_buybacks_vs_mcap.json rows:", len(df_core))
 
+# ---------------- 5) Performance series for dashboard ----------------
+# Reads data/assets.json and writes each asset's price series to its "path" as [{t, p}, ...]
+try:
+    with open("data/assets.json", "r") as f:
+        assets_idx = json.load(f)
+except FileNotFoundError:
+    assets_idx = {"assets": []}
 
+def fetch_price_series(symbol: str):
+    """
+    Pull a price series for the symbol using Artemis metrics API.
+    We keep **timestamps** (hourly/daily) for 24H/1W/1M/3M/YTD calculations on the frontend.
+    """
+    try:
+        r = API.fetch_metrics(metric_names="price", symbols=symbol,
+                              start_date=START, end_date=END)
+        payload = r.model_dump() if hasattr(r, "model_dump") else r.__dict__
+        dat = payload["data"]["symbols"].get(symbol, {})
+        rows = dat.get("price", [])
+        df = to_df_vals_ts(rows, "price")
+        return df
+    except Exception as e:
+        print(f"[perf] fetch failed for {symbol}: {e}")
+        return pd.DataFrame(columns=["ts", "price"])
 
+for a in assets_idx.get("assets", []):
+    sym  = a.get("symbol")
+    path = a.get("path")
+    if not sym or not path:
+        continue
 
+    df = fetch_price_series(sym)
+    # Trim to START and drop empties
+    df = df.loc[df["ts"] >= pd.to_datetime(START, utc=True)].reset_index(drop=True)
 
-
+    # write as [{t, p}]
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        out = [
+            {
+                "t": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "p": None if pd.isna(px) else float(px),
+            }
+            for ts, px in zip(df["ts"], df["price"])
+        ]
+        with open(path, "w") as f:
+            json.dump(out, f, separators=(",", ":"))
+        print(f"[perf ok] {sym} -> {path} ({len(out)} points)")
+    except Exception as e:
+        print(f"[perf fail] {sym}: {e}")
