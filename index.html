@@ -13,106 +13,39 @@
       --body-font:"Libre Baskerville", Georgia, "Times New Roman", serif;
       --tab:#111; --tabOff:#888; --tabBg:#fff;
     }
-    html,body{
-      margin:0; padding:0; background:#fff; color:var(--ink);
-      font-family:var(--body-font); font-size:16px; line-height:1.5;
-    }
+    html,body{ margin:0; padding:0; background:#fff; color:var(--ink); font-family:var(--body-font); font-size:16px; line-height:1.5; }
     .page{max-width:1100px; margin:28px auto; padding:28px; border:4px solid #000; box-sizing:border-box;}
 
     /* Header */
-    .hero{
-      display:flex; flex-direction:column; align-items:center; gap:10px;
-      margin-bottom:18px; border-bottom:1px solid var(--rule); padding-bottom:18px;
-    }
+    .hero{ display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:18px; border-bottom:1px solid var(--rule); padding-bottom:18px; }
     .hero img{width:120px; height:120px; object-fit:contain;}
-    .hero h1{
-      font-family:var(--heading-font);
-      font-size:44px; line-height:1.1; margin:0; text-align:center; letter-spacing:-0.5px;
-    }
+    .hero h1{ font-family:var(--heading-font); font-size:44px; line-height:1.1; margin:0; text-align:center; letter-spacing:-0.5px; }
     .f1{ display:inline-flex; align-items:flex-end; }
-    .f1 .f{ font-size:1em; line-height:1; }
-    .f1 .one{
-      font-variant-numeric: lining-nums tabular-nums;
-      display:inline-block; font-size:1.08em; line-height:1; position:relative; top:1px;
-    }
+    .f1 .one{ font-variant-numeric: lining-nums tabular-nums; display:inline-block; font-size:1.08em; position:relative; top:1px; }
 
     /* Tabs */
-    .tabs{
-      display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 18px;
-      border-bottom:1px solid var(--rule); padding-bottom:10px;
-      justify-content:center;
-    }
-    .tabs a{
-      text-decoration:none; color:var(--tabOff); background:var(--tabBg);
-      border:1px solid var(--tabOff); padding:6px 12px; border-radius:18px;
-      font:600 13px/1 var(--body-font);
-    }
+    .tabs{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 18px; border-bottom:1px solid var(--rule); padding-bottom:10px; justify-content:center; }
+    .tabs a{ text-decoration:none; color:var(--tabOff); background:var(--tabBg); border:1px solid var(--tabOff); padding:6px 12px; border-radius:18px; font:600 13px/1 var(--body-font); }
     .tabs a.active{color:#fff; background:var(--tab); border-color:var(--tab);}
 
-    /* Section headings + canvases */
-    h2{
-      font-family:var(--heading-font);
-      font-size:22px;
-      font-weight:700;
-      text-align:center;
-      margin:22px 0 8px;
-    }
+    h2{ font-family:var(--heading-font); font-size:22px; font-weight:700; text-align:center; margin:22px 0 8px; }
     canvas{max-width:100%; height:420px; margin:0 auto 30px; display:block; background:#fff;}
 
-    /* Range toolbar (centered under titles) */
-    .toolbar{
-      display:flex; justify-content:center; gap:10px; margin:8px 0 16px;
-    }
-    .toolbar button{
-      appearance:none; border:1px solid #111; background:#fff; color:#111;
-      padding:6px 10px; border-radius:18px; font:600 13px/1 var(--body-font); cursor:pointer;
-    }
+    /* Toolbars */
+    .toolbar{ display:flex; justify-content:center; gap:10px; margin:8px 0 16px; }
+    .toolbar button{ appearance:none; border:1px solid #111; background:#fff; color:#111; padding:6px 10px; border-radius:18px; font:600 13px/1 var(--body-font); cursor:pointer; }
     .toolbar button.on{background:#111; color:#fff;}
 
     /* Chart + stats layout */
-    .chart-row{
-      display:grid;
-      grid-template-columns: 1fr 280px;
-      gap:24px;
-      align-items:center;
-      margin: 18px 0 36px;
-    }
-    @media (max-width: 1000px){
-      .chart-row{ grid-template-columns: 1fr; }
-    }
-    .statbox{
-      border:1px solid var(--rule);
-      border-radius:12px;
-      padding:12px;
-      background:#fff;
-      min-height:120px;
-      align-self:center;
-    }
-
-    /* Dynamic stat cards */
-    .stat-card + .stat-card { margin-top:10px; }
-    .stat-title{
-      display:flex; justify-content:space-between; align-items:center;
-      font-weight:700; margin-bottom:6px;
-    }
-    .stat-title::after{ content:"Change"; color:#777; font-weight:600; font-size:12px; }
-    .stat-row{
-      display:grid; grid-template-columns: 3.2rem 1fr; gap:8px; align-items:center; padding:3px 0;
-    }
-    .stat-row span:first-child{ color:#333; }
-    .stat-row strong{ justify-self:end; font-feature-settings:"tnum" 1; letter-spacing:.2px; }
-    .stat-row strong.pos { color:#0a7a3c; }
-    .stat-row strong.neg { color:#b21c1c; }
-
-    .badge-up{ color:#0a7a3c; font-weight:600; }
-    .badge-down{ color:#b21c1c; font-weight:600; }
-    .muted{ color:#777; font-size:12px; }
+    .chart-row{ display:grid; grid-template-columns: 1fr 280px; gap:24px; align-items:center; margin:18px 0 36px; }
+    @media (max-width: 1000px){ .chart-row{ grid-template-columns: 1fr; } }
+    .statbox{ border:1px solid var(--rule); border-radius:12px; padding:12px; background:#fff; min-height:120px; align-self:center; }
 
     /* Tab panes */
     .tabpane{display:none;}
     .tabpane.active{display:block;}
 
-    /* ===== Performance tab styles ===== */
+    /* Performance tab bits (unchanged) */
     #pane-performance .panel-header { display:flex; justify-content:space-between; align-items:center; margin:12px 0; }
     #pane-performance .range-switch { display:flex; gap:8px; }
     #pane-performance .rng { padding:6px 10px; border:1px solid #ddd; border-radius:18px; background:#fff; cursor:pointer; font:600 13px/1 var(--body-font); }
@@ -122,79 +55,36 @@
     #perf-table th { text-align:left; }
     #perf-table td:nth-child(2), #perf-table td:nth-child(3) { text-align:right; }
     #perf-table tbody tr { cursor:pointer; }
-
-    /* NEW: relative performance picker + framed chart */
     .relperf{ margin-top:8px; }
-    .asset-picker{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin:8px 0 6px;
-      max-height:112px;
-      overflow:auto;
-      justify-content:center;
-    }
+    .asset-picker{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 6px; max-height:112px; overflow:auto; justify-content:center; }
     .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
     .asset-btn.on{background:#111;color:#fff;border-color:#111;}
     .tz-note{ text-align:right; color:#666; font-size:12px; margin:0 4px 6px; }
+    .relperf-frame{ position:relative; width:100%; height:360px; margin:8px 0 16px; background:#fff; border:1px solid #eee; border-radius:8px; }
+    .relperf-frame canvas{ position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
 
-    .relperf-frame{
-      position:relative;
-      width:100%;
-      height:360px;
-      margin:8px 0 16px;
-      background:#fff;
-      border:1px solid #eee;
-      border-radius:8px;
-    }
-    .relperf-frame canvas{
-      position:absolute;
-      inset:0;
-      width:100% !important;
-      height:100% !important;
-      display:block;
-    }
-
-    /* ===== DATs (mNAV) grid ===== */
-    .dats-grid{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:18px;
-      margin:12px 0 36px;
-    }
-    @media (max-width: 1000px){
-      .dats-grid{ grid-template-columns: 1fr; }
-    }
-    .dat-card{
-      border:1px solid var(--rule);
-      border-radius:12px;
-      background:#fff;
-      padding:10px 10px 12px;
-    }
-    .dat-head{
-      display:flex; align-items:center; justify-content:space-between;
-      margin:2px 2px 8px;
-    }
-    .dat-title{ font-weight:700; }
-    .dat-rng{ display:inline-flex; gap:6px; }
-    .dat-rng button{
-      appearance:none; border:1px solid #ddd; background:#fff; color:#111;
-      padding:4px 10px; border-radius:16px; font:600 12px/1 var(--body-font); cursor:pointer;
-    }
-    .dat-rng button.on{ background:#111; color:#fff; border-color:#111; }
-    .dat-note{ color:#777; font-size:11px; margin:4px 2px 0; }
-    .dat-canvas{ width:100%; height:260px; display:block; } /* fixed height */
+    /* DATs (mNAV) */
+    .dat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin:12px 0 36px; }
+    @media (max-width: 1000px){ .dat-grid{ grid-template-columns: 1fr; } }
+    .dat-card{ border:1px solid var(--rule); border-radius:12px; background:#fff; padding:10px 10px 12px; }
+    .dat-card .hdr{ display:flex; justify-content:space-between; align-items:center; margin:2px 2px 8px; }
+    .dat-card h3{ margin:0; font:700 18px/1.2 var(--heading-font); }
+    .chips{ display:inline-flex; gap:6px; }
+    .chips .chip{ appearance:none; border:1px solid #ddd; background:#fff; color:#111; padding:4px 10px; border-radius:16px; font:600 12px/1 var(--body-font); cursor:pointer; }
+    .chips .chip.on{ background:#111; color:#fff; border-color:#111; }
+    .dat-frame{ position:relative; width:100%; height:260px; }
+    .dat-frame canvas{ position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+    .dat-foot{ color:#777; font-size:11px; margin:6px 2px 0; }
+    .muted{ color:#777; font-size:12px; text-align:center; }
   </style>
 </head>
 <body>
   <div class="page">
-    <!-- Logo + title -->
     <div class="hero">
       <img src="assets/polychain-logo.gif" alt="Polychain logo" />
       <h1>Polychain <span class="f1"><span class="f">F</span><span class="one">1</span></span> Dashboard</h1>
     </div>
 
-    <!-- Tabs -->
     <nav class="tabs" id="tabs">
       <a href="#pump" class="active">PUMP</a>
       <a href="#dats">DATs</a>
@@ -203,16 +93,13 @@
       <a href="#performance" id="tab-performance" class="tab">Performance</a>
     </nav>
 
-    <!-- Pump tab -->
+    <!-- PUMP (unchanged charts; your existing script.js builds these) -->
     <section id="pane-pump" class="tabpane active">
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Fees</h2>
           <div class="toolbar" data-for="chart">
-            <button class="on" data-range="ALL">All</button>
-            <button data-range="3M">3M</button>
-            <button data-range="1M">1M</button>
-            <button data-range="1W">1W</button>
+            <button class="on" data-range="ALL">All</button><button data-range="3M">3M</button><button data-range="1M">1M</button><button data-range="1W">1W</button>
           </div>
           <canvas id="chart"></canvas>
         </div>
@@ -223,10 +110,7 @@
         <div>
           <h2>PUMP — Price vs Revenue</h2>
           <div class="toolbar" data-for="chart-revenue">
-            <button class="on" data-range="ALL">All</button>
-            <button data-range="3M">3M</button>
-            <button data-range="1M">1M</button>
-            <button data-range="1W">1W</button>
+            <button class="on" data-range="ALL">All</button><button data-range="3M">3M</button><button data-range="1M">1M</button><button data-range="1W">1W</button>
           </div>
           <canvas id="chart-revenue"></canvas>
         </div>
@@ -237,10 +121,7 @@
         <div>
           <h2>PUMP — Price vs Buybacks (USD)</h2>
           <div class="toolbar" data-for="chart-buybacks">
-            <button class="on" data-range="ALL">All</button>
-            <button data-range="3M">3M</button>
-            <button data-range="1M">1M</button>
-            <button data-range="1W">1W</button>
+            <button class="on" data-range="ALL">All</button><button data-range="3M">3M</button><button data-range="1M">1M</button><button data-range="1W">1W</button>
           </div>
           <canvas id="chart-buybacks"></canvas>
         </div>
@@ -251,10 +132,7 @@
         <div>
           <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
           <div class="toolbar" data-for="chart-bbmcap">
-            <button class="on" data-range="ALL">All</button>
-            <button data-range="3M">3M</button>
-            <button data-range="1M">1M</button>
-            <button data-range="1W">1W</button>
+            <button class="on" data-range="ALL">All</button><button data-range="3M">3M</button><button data-range="1M">1M</button><button data-range="1W">1W</button>
           </div>
           <canvas id="chart-bbmcap"></canvas>
         </div>
@@ -265,58 +143,55 @@
     <!-- DATs -->
     <section id="pane-dats" class="tabpane">
       <h2>mNAV</h2>
-      <p class="muted" style="text-align:center;margin-top:2px;">
-        Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>.
-        We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.
-      </p>
-      <!-- Cards are injected by script.js (DATs module) -->
-      <div id="dats-grid" class="dats-grid"></div>
+      <p class="muted">Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>. We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.</p>
+
+      <div class="dat-grid">
+        <!-- Repeatable card pattern -->
+        <div class="dat-card"><div class="hdr"><h3>MSTR — mNAV</h3><div class="chips" data-for="mnav-MSTR">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-MSTR"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+
+        <div class="dat-card"><div class="hdr"><h3>MTPLF — mNAV</h3><div class="chips" data-for="mnav-MTPLF">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-MTPLF"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+
+        <div class="dat-card"><div class="hdr"><h3>SBET — mNAV</h3><div class="chips" data-for="mnav-SBET">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-SBET"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+
+        <div class="dat-card"><div class="hdr"><h3>BMNR — mNAV</h3><div class="chips" data-for="mnav-BMNR">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-BMNR"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+
+        <div class="dat-card"><div class="hdr"><h3>DFDV — mNAV</h3><div class="chips" data-for="mnav-DFDV">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-DFDV"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+
+        <div class="dat-card"><div class="hdr"><h3>UPXI — mNAV</h3><div class="chips" data-for="mnav-UPXI">
+          <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
+        </div></div><div class="dat-frame"><canvas id="mnav-UPXI"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
+      </div>
     </section>
 
-    <!-- HYPE -->
-    <section id="pane-hype" class="tabpane">
-      <h2>HYPE (placeholder)</h2>
-      <p>All things HYPE will go here.</p>
-    </section>
+    <!-- HYPE / Risk placeholders -->
+    <section id="pane-hype" class="tabpane"><h2>HYPE (placeholder)</h2><p>All things HYPE will go here.</p></section>
+    <section id="pane-risk" class="tabpane"><h2>Risk (placeholder)</h2><p>XYZ.</p></section>
 
-    <!-- Risk -->
-    <section id="pane-risk" class="tabpane">
-      <h2>Risk (placeholder)</h2>
-      <p>XYZ.</p>
-    </section>
-
-    <!-- Performance tab pane -->
+    <!-- Performance -->
     <section id="pane-performance" class="tabpane">
       <div class="panel-header">
         <h2>Performance</h2>
         <div class="range-switch">
-          <button class="rng" data-range="24H">24H</button>
-          <button class="rng" data-range="1W">1W</button>
-          <button class="rng" data-range="1M">1M</button>
-          <button class="rng" data-range="3M">3M</button>
-          <button class="rng active" data-range="YTD">YTD</button>
+          <button class="rng" data-range="24H">24H</button><button class="rng" data-range="1W">1W</button><button class="rng" data-range="1M">1M</button><button class="rng" data-range="3M">3M</button><button class="rng active" data-range="YTD">YTD</button>
         </div>
       </div>
-
       <div class="relperf">
         <div id="relperf-picker" class="asset-picker"></div>
         <div class="tz-note">Times shown in Eastern Time (ET)</div>
-        <div class="relperf-frame">
-          <canvas id="relperf-chart"></canvas>
-        </div>
+        <div class="relperf-frame"><canvas id="relperf-chart"></canvas></div>
       </div>
-
       <div class="table-wrap">
-        <table id="perf-table">
-          <thead>
-            <tr>
-              <th>Asset</th>
-              <th>Price</th>
-              <th>Change</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <table id="perf-table"><thead><tr><th>Asset</th><th>Price</th><th>Change</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
   </div>
@@ -339,41 +214,21 @@
           a.classList.toggle('active', href === target);
         });
         Object.entries(panes).forEach(([k, el]) => el.classList.toggle('active', k === target));
-        if (target === 'pump' && window.__charts) {
-          Object.values(window.__charts).forEach(obj => obj?.chart?.resize?.());
-        }
+        if (target === 'pump' && window.__charts) Object.values(window.__charts).forEach(obj => obj?.chart?.resize?.());
         if (target === 'performance') {
           const perfTab = document.getElementById('tab-performance');
-          if (perfTab && !perfTab.__initFired) {
-            perfTab.__initFired = true;
-            perfTab.dispatchEvent(new Event('click'));
-          }
+          if (perfTab && !perfTab.__initFired) { perfTab.__initFired = true; perfTab.dispatchEvent(new Event('click')); }
         }
-        if (target === 'dats') {
-          document.dispatchEvent(new Event('open-dats'));
-        }
+        if (target === 'dats') document.dispatchEvent(new Event('open-dats'));
       }
-      function fromHash() {
-        const h = (location.hash || '#pump').slice(1).toLowerCase();
-        activate(panes[h] ? h : 'pump');
-      }
+      function fromHash(){ const h=(location.hash||'#pump').slice(1).toLowerCase(); activate(panes[h]?h:'pump'); }
       window.addEventListener('hashchange', fromHash);
-      links.forEach(a => a.addEventListener('click', (e) => {
-        e.preventDefault();
-        location.hash = a.getAttribute('href');
-      }));
+      links.forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); location.hash = a.getAttribute('href'); }));
       fromHash();
-
-      if ((location.hash || '').toLowerCase() === '#dats') {
-        document.addEventListener('DOMContentLoaded', () => {
-          document.dispatchEvent(new Event('open-dats'));
-        });
-      }
+      if ((location.hash||'').toLowerCase()==='#dats') document.addEventListener('DOMContentLoaded', () => document.dispatchEvent(new Event('open-dats')));
     })();
   </script>
 
-  <!-- Charts + stats + Performance + DATs logic (cache-busted) -->
-  <script src="script.js?v=dats-1w"></script>
+  <script src="script.js"></script>
 </body>
 </html>
-
