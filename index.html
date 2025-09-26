@@ -112,7 +112,7 @@
     .tabpane{display:none;}
     .tabpane.active{display:block;}
 
-    /* ===== Performance tab styles (id must be #pane-performance) ===== */
+    /* ===== Performance tab styles ===== */
     #pane-performance .panel-header { display:flex; justify-content:space-between; align-items:center; margin:12px 0; }
     #pane-performance .range-switch { display:flex; gap:8px; }
     #pane-performance .rng { padding:6px 10px; border:1px solid #ddd; border-radius:18px; background:#fff; cursor:pointer; font:600 13px/1 var(--body-font); }
@@ -155,6 +155,36 @@
       height:100% !important;
       display:block;
     }
+
+    /* ===== DATs (mNAV) grid ===== */
+    .dats-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:18px;
+      margin:12px 0 36px;
+    }
+    @media (max-width: 1000px){
+      .dats-grid{ grid-template-columns: 1fr; }
+    }
+    .dat-card{
+      border:1px solid var(--rule);
+      border-radius:12px;
+      background:#fff;
+      padding:10px 10px 12px;
+    }
+    .dat-head{
+      display:flex; align-items:center; justify-content:space-between;
+      margin:2px 2px 8px;
+    }
+    .dat-title{ font-weight:700; }
+    .dat-rng{ display:inline-flex; gap:6px; }
+    .dat-rng button{
+      appearance:none; border:1px solid #ddd; background:#fff; color:#111;
+      padding:4px 10px; border-radius:16px; font:600 12px/1 var(--body-font); cursor:pointer;
+    }
+    .dat-rng button.on{ background:#111; color:#fff; border-color:#111; }
+    .dat-note{ color:#777; font-size:11px; margin:4px 2px 0; }
+    .dat-canvas{ width:100%; height:260px; display:block; }
   </style>
 </head>
 <body>
@@ -239,8 +269,14 @@
 
     <!-- DATs -->
     <section id="pane-dats" class="tabpane">
-      <h2>DATs (placeholder)</h2>
-      <p>DAT info will go here.</p>
+      <h2>mNAV</h2>
+      <p class="muted" style="text-align:center;margin-top:2px;">
+        Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>.
+        We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.
+      </p>
+      <div class="dats-grid" id="dats-grid">
+        <!-- Cards are injected by script.js (DATs module) -->
+      </div>
     </section>
 
     <!-- HYPE -->
@@ -255,7 +291,7 @@
       <p>XYZ.</p>
     </section>
 
-    <!-- Performance tab pane (id must be pane-performance) -->
+    <!-- Performance tab pane -->
     <section id="pane-performance" class="tabpane">
       <div class="panel-header">
         <h2>Performance</h2>
@@ -320,6 +356,10 @@
             perfTab.dispatchEvent(new Event('click'));
           }
         }
+        if (target === 'dats') {
+          // Let script.js know the DATs pane is visible (for lazy init)
+          document.dispatchEvent(new Event('open-dats'));
+        }
       }
       function fromHash() {
         const h = (location.hash || '#pump').slice(1).toLowerCase();
@@ -331,10 +371,18 @@
         location.hash = a.getAttribute('href');
       }));
       fromHash();
+
+      // If we land directly on #dats, also fire once after DOM ready
+      if ((location.hash || '').toLowerCase() === '#dats') {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.dispatchEvent(new Event('open-dats'));
+        });
+      }
     })();
   </script>
 
-  <!-- Charts + stats + Performance logic -->
+  <!-- Charts + stats + Performance + DATs logic -->
   <script src="script.js"></script>
 </body>
 </html>
+
