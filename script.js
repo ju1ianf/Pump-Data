@@ -412,11 +412,10 @@ window.__charts = {};
     initialized: false,
   };
 
-  // ---------- CoinGecko integration (24H only for selected symbols) ----------
-  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script> in index.html (optional)
+  // CoinGecko Pro key (optional) set in index.html:
+  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script>
   const CG_API_KEY = (typeof window !== "undefined" && window.Polychain_GC_API) ? window.Polychain_GC_API : "";
 
-  // Map symbols -> CoinGecko IDs (adjust any that differ)
   const CG_IDS = {
     HYPE:  "hyperliquid",
     SOL:   "solana",
@@ -425,7 +424,7 @@ window.__charts = {};
     XAUT:  "tether-gold",
     PUMP:  "pump",
     BERA:  "bera",
-    IP:    "internet-computer", // Story Protocol ticker in your table
+    IP:    "internet-computer",
     TAO:   "bittensor",
     ETHFI: "ether-fi",
     MOVE:  "movement",
@@ -561,7 +560,6 @@ window.__charts = {};
   }
   function colorFor(sym) { let h=0; for (let i=0;i<sym.length;i++) h=(h*31+sym.charCodeAt(i))>>>0; return `hsl(${h%360} 70% 45%)`; }
 
-  // Central loader: 24H for selected symbols via CoinGecko, otherwise Artemis
   async function getSeries(symbol, path) {
     const key = `${symbol}:${state.range}`;
     if (state.cache.has(key)) return state.cache.get(key);
@@ -569,7 +567,7 @@ window.__charts = {};
     let series = null;
     const useCG = (state.range === "24H") && !!CG_IDS[symbol];
     if (useCG) {
-      series = await fetchCG24H(symbol); // Pro -> Public -> null
+      series = await fetchCG24H(symbol);
     }
     if (!series) {
       try {
@@ -628,7 +626,6 @@ window.__charts = {};
     return pts;
   }
 
-  // === Relative Performance chart (leader-first tooltip) ===
   async function updateRelPerfChart() {
     const canvas = document.getElementById("relperf-chart");
     if (!canvas || !state.assetsIndex) return;
@@ -669,7 +666,7 @@ window.__charts = {};
     const tooltipItemSort = (a, b) => {
       const ya = Number.isFinite(a.parsed?.y) ? a.parsed.y : -Infinity;
       const yb = Number.isFinite(b.parsed?.y) ? b.parsed.y : -Infinity;
-      return yb - ya; // leader first
+      return yb - ya;
     };
     const tooltipFilter = (item) => Number.isFinite(item.parsed?.y);
 
@@ -726,7 +723,6 @@ window.__charts = {};
     }
   }
 
-  // --------- Table rendering ---------
   async function renderTable() {
     const tbody = document.querySelector("#perf-table tbody");
     if (!tbody) return;
@@ -775,13 +771,10 @@ window.__charts = {};
     }
   }
 
-  // --------- init & wiring ---------
   async function init() {
-    // load index
     const idxRes = await fetch("data/assets.json", { cache: "no-store" });
     state.assetsIndex = await idxRes.json();
 
-    // range buttons (ONLY inside the performance pane)
     document.addEventListener("click", (e) => {
       const btn = e.target.closest('#pane-performance .rng[data-range]');
       if (!btn) return;
@@ -793,14 +786,11 @@ window.__charts = {};
       updateRelPerfChart();
     });
 
-    // selector chips
     buildPicker();
-
     await renderTable();
     await updateRelPerfChart();
   }
 
-  // lazy init when the tab is opened; init immediately if already active
   document.addEventListener("DOMContentLoaded", () => {
     const perfTab = document.getElementById("tab-performance");
     if (perfTab) {
@@ -823,8 +813,7 @@ window.__charts = {};
 
 /* =================== DATs (mNAV) module =================== */
 (() => {
-  // Canvas IDs below must match the IDs in index.html
-  // Files must exist in /data/dats/*.json (add via GitHub UI).
+  // The canvases must exist in HTML with these IDs (one per card).
   const SERIES = [
     { id: "mnav-MSTR", file: "data/dats/mnav_MSTR.json" },
     { id: "mnav-MTPLF", file: "data/dats/mnav_MTPLF.json" },
@@ -834,23 +823,61 @@ window.__charts = {};
     { id: "mnav-UPXI", file: "data/dats/mnav_UPXI.json" },
   ];
 
-  const state = {
-    inited: false,
-    charts: new Map(),   // canvasId -> { chart, series }
-  };
+  const datsState = { inited:false, charts:new Map() };
 
-  function normalizeMnav(raw) {
-    const rows = Array.isArray(raw?.series) ? raw.series : (Array.isArray(raw) ? raw : []);
-    const out = [];
-    for (const r of rows) {
-      const d = r.date ?? r.t ?? r.time ?? r.timestamp;
-      const v = r.mnav ?? r.M_NAV ?? r.value ?? r.v;
-      if (!d || v == null || Number.isNaN(+v)) continue;
-      const iso = (typeof d === "string") ? d : new Date(d * 1000).toISOString();
-      out.push({ date: iso, mnav: +v });
+  // ---- helpers to build DAILY mNAV safely ----
+  function num(x){ const n=+x; return Number.isFinite(n)?n:null; }
+  function lcKeys(obj){ const out={}; for(const k in obj){ out[k.toLowerCase()]=obj[k]; } return out; }
+
+  // pick a numeric by trying multiple key aliases
+  function pick(obj, names){
+    for(const n of names){
+      if (obj[n] != null && Number.isFinite(+obj[n])) return +obj[n];
     }
-    out.sort((a,b) => new Date(a.date) - new Date(b.date));
-    return out;
+    return null;
+  }
+
+  // convert any timeseries payload to [{date:<ISO>, mnav:<number>}], DAILY
+  function normalizeDailyMnav(payload){
+    const rows = Array.isArray(payload?.series) ? payload.series
+               : Array.isArray(payload) ? payload
+               : Array.isArray(payload?.data) ? payload.data
+               : [];
+
+    const tmp = [];
+    for(const r0 of rows){
+      const r = lcKeys(r0);
+      const dRaw = r.date ?? r.t ?? r.time ?? r.timestamp;
+      if (dRaw == null) continue;
+      const iso = (typeof dRaw==="string") ? dRaw : new Date(dRaw*1000).toISOString();
+
+      // preferred: explicit mnav
+      let mnav = pick(r, ["mnav","m_nav","ratio"]);
+      // fallback: price*shares/nav
+      if (mnav == null){
+        const price = pick(r, ["price","px","close","c","p"]);
+        const shares= pick(r, ["shares","sh_out","shout","shares_outstanding","float"]);
+        const nav   = pick(r, ["nav","nav_usd","net_asset_value"]);
+        const mcap  = pick(r, ["market_cap","marketcap","mcap","mv"]);
+        if (price!=null && shares!=null && nav!=null && nav!==0) mnav = (price*shares)/nav;
+        else if (mcap!=null && nav!=null && nav!==0) mnav = mcap/nav;
+      }
+
+      // guard: some feeds accidentally drop market cap into mnav; try to reject absurd values
+      if (mnav != null && !Number.isFinite(mnav)) mnav = null;
+
+      if (mnav != null) tmp.push({ date: iso, mnav: +mnav });
+    }
+
+    // group by UTC day -> take the latest point (daily)
+    tmp.sort((a,b)=> new Date(a.date) - new Date(b.date));
+    const byDay = new Map(); // YYYY-MM-DD -> last row
+    for (const r of tmp){
+      const d = new Date(r.date);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+      byDay.set(key, r); // keep the last seen for that day
+    }
+    return Array.from(byDay.values());
   }
 
   function filterRange(series, token) {
@@ -858,41 +885,40 @@ window.__charts = {};
     const last = new Date(series[series.length - 1].date);
     const back = new Date(last);
     if (token === "3M") back.setMonth(back.getMonth() - 3);
-    else back.setMonth(back.getMonth() - 1); // 1M default
+    else if (token === "1M") back.setMonth(back.getMonth() - 1);
+    else if (token === "1W") back.setDate(back.getDate() - 7);
     return series.filter(r => new Date(r.date) >= back);
   }
 
-  function toMnavPts(rows) {
-    return rows.map(d => ({ x: new Date(d.date), y: d.mnav }));
-  }
+  const toPtsMnav = (rows) => rows.map(d => ({ x:new Date(d.date), y:d.mnav }));
 
-  async function buildOne({ id, file }) {
-    if (state.charts.has(id)) return;
+  async function buildChart({ id, file }) {
+    if (datsState.charts.has(id)) return;
 
-    // fetch + normalize
-    let json;
+    // fetch + normalize -> DAILY mNAV
+    let raw;
     try {
-      const res = await fetch(file, { cache: "no-store" });
-      json = await res.json();
-    } catch (e) {
-      console.error("mNAV fetch failed:", id, e);
+      const res = await fetch(file, { cache:"no-store" });
+      raw = await res.json();
+    } catch(e){
+      console.error("DAT fetch failed:", id, e);
       return;
     }
-    const series = normalizeMnav(json);
-    if (!series.length) return;
+    const daily = normalizeDailyMnav(raw);
+    if (!daily.length) return;
 
-    const canvas = document.getElementById(id);
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    // Default range 1W
+    const initial = filterRange(daily, "1W");
 
-    // default 1M
-    const initial = filterRange(series, "1M");
+    const cnv = document.getElementById(id);
+    if (!cnv) return;
+    const ctx = cnv.getContext("2d");
 
     const chart = new Chart(ctx, {
       type: "line",
       data: { datasets: [{
         label: "mNAV",
-        data: toMnavPts(initial),
+        data: toPtsMnav(initial),
         borderColor: "#111",
         backgroundColor: "transparent",
         pointRadius: 0,
@@ -902,10 +928,10 @@ window.__charts = {};
         spanGaps: true
       }]},
       options: {
-        maintainAspectRatio: false, // uses the fixed-height .dat-frame
-        interaction: { mode: "index", axis: "x", intersect: false },
+        maintainAspectRatio: false, // canvas height is controlled by CSS
+        interaction: { mode:"index", axis:"x", intersect:false },
         plugins: {
-          legend: { display: false },
+          legend: { display:false },
           tooltip: {
             filter: (item) => Number.isFinite(item.parsed?.y),
             callbacks: {
@@ -913,7 +939,7 @@ window.__charts = {};
                 const ts = items[0].parsed.x ?? items[0].label;
                 return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
               },
-              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined,{ maximumFractionDigits: 3 })}`
+              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined,{ maximumFractionDigits: 4 })}`
             }
           }
         },
@@ -929,45 +955,37 @@ window.__charts = {};
             }
           },
           y: {
-            ticks: { callback: v => Number(v).toLocaleString(undefined,{ maximumFractionDigits: 3 }) }
+            ticks: { callback: v => Number(v).toLocaleString(undefined,{ maximumFractionDigits: 4 }) }
           }
         }
       }
     });
 
-    // wire chips for this chart
+    // Range chips for this chart (now include 1W)
     const chips = document.querySelector(`.chips[data-for="${id}"]`);
     chips?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-range]");
       if (!btn) return;
       chips.querySelectorAll(".chip").forEach(b => b.classList.toggle("on", b === btn));
-      const subset = filterRange(series, btn.dataset.range);
-      chart.data.datasets[0].data = toMnavPts(subset);
+      const subset = filterRange(daily, btn.dataset.range);
+      chart.data.datasets[0].data = toPtsMnav(subset);
       chart.update();
     });
 
-    state.charts.set(id, { chart, series });
+    datsState.charts.set(id, { chart, series: daily });
   }
 
-  async function init() {
-    if (state.inited) return;
-    state.inited = true;
-    for (const cfg of SERIES) {
-      await buildOne(cfg);
-    }
+  async function initDats(){
+    if (datsState.inited) return;
+    datsState.inited = true;
+    for (const cfg of SERIES) await buildChart(cfg);
   }
 
-  // Lazy init when the tab becomes visible
-  document.addEventListener("open-dats", () => {
-    init().catch(e => console.error("DATs init error:", e));
-  });
-
-  // If the page loads directly on #dats
+  document.addEventListener("open-dats", () => { initDats().catch(e => console.error(e)); });
   if ((location.hash || "").toLowerCase() === "#dats") {
-    document.addEventListener("DOMContentLoaded", () => {
-      init().catch(e => console.error("DATs init error:", e));
-    });
+    document.addEventListener("DOMContentLoaded", () => { initDats().catch(e => console.error(e)); });
   }
 })();
+
 
 
