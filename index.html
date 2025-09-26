@@ -132,17 +132,16 @@
       margin:8px 0 6px;
       max-height:112px;
       overflow:auto;
-      justify-content:center; /* centered chips */
+      justify-content:center;
     }
     .asset-btn{padding:6px 10px;border:1px solid #ddd;border-radius:18px;background:#fff;cursor:pointer;font:600 12px/1 var(--body-font);}
     .asset-btn.on{background:#111;color:#fff;border-color:#111;}
     .tz-note{ text-align:right; color:#666; font-size:12px; margin:0 4px 6px; }
 
-    /* Fixed-size frame that prevents the canvas from stretching the page */
     .relperf-frame{
       position:relative;
       width:100%;
-      height:360px;             /* <- adjust once if you want a different height */
+      height:360px;
       margin:8px 0 16px;
       background:#fff;
       border:1px solid #eee;
@@ -156,15 +155,15 @@
       display:block;
     }
 
-    /* ===== DATs (mNAV) layout ===== */
-    .dat-grid{
+    /* ===== DATs (mNAV) grid ===== */
+    .dats-grid{
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap:18px;
       margin:12px 0 36px;
     }
     @media (max-width: 1000px){
-      .dat-grid{ grid-template-columns: 1fr; }
+      .dats-grid{ grid-template-columns: 1fr; }
     }
     .dat-card{
       border:1px solid var(--rule);
@@ -172,33 +171,19 @@
       background:#fff;
       padding:10px 10px 12px;
     }
-    .dat-card .hdr{
-      display:flex; justify-content:space-between; align-items:center;
+    .dat-head{
+      display:flex; align-items:center; justify-content:space-between;
       margin:2px 2px 8px;
     }
-    .dat-card h3{
-      margin:0;
-      font:700 18px/1.2 var(--heading-font);
-    }
-    .chips{ display:inline-flex; gap:6px; }
-    .chips .chip{
+    .dat-title{ font-weight:700; }
+    .dat-rng{ display:inline-flex; gap:6px; }
+    .dat-rng button{
       appearance:none; border:1px solid #ddd; background:#fff; color:#111;
-      padding:4px 10px; border-radius:16px; font:600 12px/1 var(--body-font);
-      cursor:pointer;
+      padding:4px 10px; border-radius:16px; font:600 12px/1 var(--body-font); cursor:pointer;
     }
-    .chips .chip.on{ background:#111; color:#fff; border-color:#111; }
-
-    .dat-frame{
-      position:relative;
-      width:100%;
-      height:260px;   /* fixed height so charts don't drag page */
-    }
-    .dat-frame canvas{
-      position:absolute; inset:0;
-      width:100% !important; height:100% !important;
-      display:block;
-    }
-    .dat-foot{ color:#777; font-size:11px; margin:6px 2px 0; }
+    .dat-rng button.on{ background:#111; color:#fff; border-color:#111; }
+    .dat-note{ color:#777; font-size:11px; margin:4px 2px 0; }
+    .dat-canvas{ width:100%; height:260px; display:block; } /* fixed height */
   </style>
 </head>
 <body>
@@ -220,7 +205,6 @@
 
     <!-- Pump tab -->
     <section id="pane-pump" class="tabpane active">
-      <!-- Price vs Fees -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Fees</h2>
@@ -235,7 +219,6 @@
         <aside class="statbox" id="stats-chart"></aside>
       </div>
 
-      <!-- Price vs Revenue -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Revenue</h2>
@@ -250,7 +233,6 @@
         <aside class="statbox" id="stats-chart-rev"></aside>
       </div>
 
-      <!-- Price vs Buybacks (USD) -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Price vs Buybacks (USD)</h2>
@@ -265,7 +247,6 @@
         <aside class="statbox" id="stats-chart-bb"></aside>
       </div>
 
-      <!-- Cumulative Buybacks vs Circulating Market Cap -->
       <div class="chart-row">
         <div>
           <h2>PUMP — Cumulative Buybacks vs Circulating Market Cap</h2>
@@ -286,94 +267,10 @@
       <h2>mNAV</h2>
       <p class="muted" style="text-align:center;margin-top:2px;">
         Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>.
-       We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.
+        We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.
       </p>
-
-      <div class="dat-grid">
-        <!-- 1 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>MSTR — mNAV</h3>
-            <div class="chips" data-for="mnav-MSTR">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-MSTR"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-
-        <!-- 2 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>MTPLF — mNAV</h3>
-            <div class="chips" data-for="mnav-MTPLF">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-MTPLF"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-
-        <!-- 3 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>SBET — mNAV</h3>
-            <div class="chips" data-for="mnav-SBET">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-SBET"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-
-        <!-- 4 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>BMNR — mNAV</h3>
-            <div class="chips" data-for="mnav-BMNR">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-BMNR"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-
-        <!-- 5 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>DFDV — mNAV</h3>
-            <div class="chips" data-for="mnav-DFDV">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-DFDV"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-
-        <!-- 6 -->
-        <div class="dat-card">
-          <div class="hdr">
-            <h3>UPXI — mNAV</h3>
-            <div class="chips" data-for="mnav-UPXI">
-              <button class="chip on" data-range="1M">1M</button>
-              <button class="chip" data-range="3M">3M</button>
-              <button class="chip" data-range="ALL">All</button>
-            </div>
-          </div>
-          <div class="dat-frame"><canvas id="mnav-UPXI"></canvas></div>
-          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
-        </div>
-      </div>
+      <!-- Cards are injected by script.js (DATs module) -->
+      <div id="dats-grid" class="dats-grid"></div>
     </section>
 
     <!-- HYPE -->
@@ -401,7 +298,6 @@
         </div>
       </div>
 
-      <!-- Relative performance (fixed-size frame) -->
       <div class="relperf">
         <div id="relperf-picker" class="asset-picker"></div>
         <div class="tz-note">Times shown in Eastern Time (ET)</div>
@@ -476,8 +372,8 @@
     })();
   </script>
 
-  <!-- Charts + stats + Performance + DATs logic -->
-  <script src="script.js"></script>
+  <!-- Charts + stats + Performance + DATs logic (cache-busted) -->
+  <script src="script.js?v=dats-1w"></script>
 </body>
 </html>
 
