@@ -809,7 +809,7 @@ window.__charts = {};
 
 /* =================== DATs (mNAV) module =================== */
 (() => {
-  // Files & IDs (script builds the cards for you; HTML has <div id="dats-grid">)
+  // Files to read
   const CARDS = [
     { symbol: "MSTR", title: "MSTR — mNAV", file: "data/dats/mnav_MSTR.json" },
     { symbol: "MTPLF", title: "MTPLF — mNAV", file: "data/dats/mnav_MTPLF.json" },
@@ -819,7 +819,7 @@ window.__charts = {};
     { symbol: "UPXI", title: "UPXI — mNAV", file: "data/dats/mnav_UPXI.json" },
   ];
 
-  // Force chart start dates (UTC) per your request
+  // Force chart start dates (UTC)
   const STARTS = {
     MSTR: "2024-04-14",
     MTPLF:"2025-01-23",
@@ -831,76 +831,71 @@ window.__charts = {};
 
   const datsState = { inited:false, charts:new Map() };
 
-  function lcKeys(obj){ const out={}; for(const k in obj){ out[k.toLowerCase()]=obj[k]; } return out; }
-  function pick(obj, names){
-    for (const n of names) {
-      if (obj[n] != null && Number.isFinite(+obj[n])) return +obj[n];
-    }
-    return null;
-  }
+  // Helpers
+  const dayMS = 86400000;
+  const lc = (o) => { const x={}; for (const k in o) x[k.toLowerCase()] = o[k]; return x; };
+  const pickNum = (o, keys) => { for (const k of keys) if (o[k] != null && isFinite(+o[k])) return +o[k]; return null; };
 
-  // Normalize arbitrary payload to [{date:ISO, mnav:number}] (NOT yet daily)
-  function normalizeMnav(payload){
+  // Normalize to [{date:ISO, mnav:number}] (not yet daily)
+  function normalizeMnav(payload, sym){
     const rows = Array.isArray(payload?.series) ? payload.series
                : Array.isArray(payload) ? payload
                : Array.isArray(payload?.data) ? payload.data
                : [];
     const out = [];
     for (const r0 of rows){
-      const r = lcKeys(r0);
+      const r = lc(r0);
       const dRaw = r.date ?? r.t ?? r.time ?? r.timestamp;
       if (dRaw == null) continue;
       const iso = (typeof dRaw === "string") ? dRaw : new Date(dRaw*1000).toISOString();
 
-      // 1) direct mnav
-      let mnav = pick(r, ["mnav","m_nav","ratio"]);
-      // 2) compute from price*shares/nav
+      // prefer direct mnav
+      let mnav = pickNum(r, ["mnav","m_nav","ratio"]);
+      // or compute from pieces
       if (mnav == null){
-        const price = pick(r, ["price","px","close","c","p"]);
-        const shares= pick(r, ["shares","sh_out","shout","shares_outstanding","float"]);
-        const nav   = pick(r, ["nav","nav_usd","net_asset_value"]);
-        const mcap  = pick(r, ["market_cap","marketcap","mcap","mv"]);
+        const price  = pickNum(r, ["price","px","close","c","p"]);
+        const shares = pickNum(r, ["shares","sh_out","shares_outstanding","float"]);
+        const nav    = pickNum(r, ["nav","nav_usd","net_asset_value"]);
+        const mcap   = pickNum(r, ["market_cap","marketcap","mcap","mv"]);
         if (price!=null && shares!=null && nav!=null && nav!==0) mnav = (price*shares)/nav;
         else if (mcap!=null && nav!=null && nav!==0) mnav = mcap/nav;
       }
-      if (mnav != null && Number.isFinite(mnav)) out.push({ date: iso, mnav: +mnav });
+      if (mnav != null && isFinite(mnav)) out.push({ date: iso, mnav:+mnav });
     }
     out.sort((a,b)=> new Date(a.date) - new Date(b.date));
+    if (!out.length) console.warn(`[DATs] ${sym}: no usable rows in payload`, payload);
     return out;
   }
 
-  // Collapse to DAILY (keep last per day), then forward-fill on a daily grid
+  // Collapse to daily (keep last per day), then forward-fill on daily grid
   function toDailyForwardFilled(rows, startISO){
     if (!rows.length) return [];
-    // Collapse to one point per UTC day (take the latest)
-    const byDay = new Map(); // YYYY-MM-DD -> value
+    const byDay = new Map(); // YYYY-MM-DD -> value (last of day)
     for (const r of rows){
       const d = new Date(r.date);
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
       byDay.set(key, r.mnav);
     }
-    const firstKey = Array.from(byDay.keys())[0];
-    const lastKey  = Array.from(byDay.keys()).at(-1);
+    const keys = Array.from(byDay.keys());
+    const firstKey = keys[0];
+    const lastKey  = keys[keys.length-1];
 
-    const start = new Date(startISO ? `${startISO}T00:00:00Z` : `${firstKey}T00:00:00Z`);
-    const first = new Date(`${firstKey}T00:00:00Z`);
-    const end   = new Date(`${lastKey}T00:00:00Z`);
+    const start = new Date((startISO || firstKey) + "T00:00:00Z");
+    const end   = new Date(lastKey + "T00:00:00Z");
 
-    // Use first known value to fill from requested start until first data point
     let lastVal = byDay.get(firstKey);
-
     const out = [];
-    for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
+    for (let t = start.getTime(); t <= end.getTime(); t += dayMS){
       const d = new Date(t);
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
       const v = byDay.has(key) ? byDay.get(key) : lastVal;
-      if (byDay.has(key)) lastVal = v; // advance carry
+      if (byDay.has(key)) lastVal = v;
       out.push({ date: d.toISOString(), mnav: v });
     }
     return out;
   }
 
-  function filterMnavRange(series, token) {
+  function filterMnavRange(series, token){
     if (!series.length || token === "ALL") return series;
     const last = new Date(series[series.length - 1].date);
     const back = new Date(last);
@@ -912,11 +907,10 @@ window.__charts = {};
 
   const mnavPts = (rows) => rows.map(d => ({ x: new Date(d.date), y: d.mnav }));
 
-  function makeCard({ symbol, title }) {
+  function makeCard({ symbol, title }){
     const card = document.createElement("div");
     card.className = "dat-card";
     card.id = `dat-${symbol}`;
-
     card.innerHTML = `
       <div class="dat-head">
         <div class="dat-title">${title}</div>
@@ -933,26 +927,45 @@ window.__charts = {};
     return card;
   }
 
-  async function buildChart(cfg) {
+  function showEmpty(symbol, msg){
+    const host = document.querySelector(`#dat-${symbol}`);
+    if (!host) return;
+    const box = document.createElement("div");
+    box.style.padding = "12px";
+    box.style.color = "#666";
+    box.style.fontSize = "13px";
+    box.textContent = msg || "No data found for this asset.";
+    host.appendChild(box);
+  }
+
+  async function buildChart(cfg){
     if (datsState.charts.has(cfg.symbol)) return;
 
     let raw;
     try {
-      const res = await fetch(cfg.file, { cache: "no-store" });
+      // add tiny cache-buster to be extra sure we bypass GH Pages caches
+      const res = await fetch(`${cfg.file}?v=daily`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       raw = await res.json();
     } catch (e) {
-      console.error("DAT fetch failed:", cfg.symbol, e);
+      console.error(`[DATs] fetch failed for ${cfg.symbol}:`, e);
+      showEmpty(cfg.symbol, "Could not load data.");
       return;
     }
 
-    const normalized = normalizeMnav(raw);
-    if (!normalized.length) return;
+    const normalized = normalizeMnav(raw, cfg.symbol);
+    if (!normalized.length) {
+      showEmpty(cfg.symbol, "No mNAV rows found in file.");
+      return;
+    }
 
-    // Force start date & create DAILY forward-filled grid
     const startISO = STARTS[cfg.symbol] || null;
     const daily = toDailyForwardFilled(normalized, startISO);
+    if (!daily.length) {
+      showEmpty(cfg.symbol, "No daily points after normalization.");
+      return;
+    }
 
-    // Default = 1W
     const initial = filterMnavRange(daily, "1W");
 
     const canvas = document.getElementById(`dat-canvas-${cfg.symbol}`);
@@ -1001,21 +1014,17 @@ window.__charts = {};
               }
             }
           },
-          y: {
-            ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 }) }
-          }
+          y: { ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 }) } }
         }
       }
     });
 
-    // Wire range buttons (now includes 1W)
     const rng = document.querySelector(`#dat-${cfg.symbol} .dat-rng`);
     rng?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-range]");
       if (!btn) return;
       rng.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
-      const token = btn.dataset.range;
-      const subset = filterMnavRange(daily, token);
+      const subset = filterMnavRange(daily, btn.dataset.range);
       chart.data.datasets[0].data = mnavPts(subset);
       chart.update();
     });
@@ -1023,26 +1032,23 @@ window.__charts = {};
     datsState.charts.set(cfg.symbol, { chart, series: daily });
   }
 
-  async function initDats() {
+  async function initDats(){
     if (datsState.inited) return;
     datsState.inited = true;
     const grid = document.getElementById("dats-grid");
     if (!grid) return;
 
-    // Build cards
     for (const cfg of CARDS) grid.appendChild(makeCard(cfg));
-    // Build charts
     for (const cfg of CARDS) await buildChart(cfg);
   }
 
-  // Lazy-init when the DATs tab is shown
   document.addEventListener("open-dats", () => { initDats().catch(e => console.error("DATs init error:", e)); });
 
-  // If user lands directly on #dats with a hard refresh
   if ((location.hash || "").toLowerCase() === "#dats") {
     document.addEventListener("DOMContentLoaded", () => {
       initDats().catch(e => console.error("DATs init error:", e));
     });
   }
 })();
+
 
