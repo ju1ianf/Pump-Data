@@ -820,10 +820,13 @@ window.__charts = {};
   });
 })();
 
-/* =================== DATs (mNAV) module — Artemis JSON =================== */
+/* =================== DATs (mNAV) module =================== */
 (() => {
-  // Where to fetch Artemis-exported JSON for each symbol
-  const DAT_FILES = {
+  // Files written by fetch_artemis.py:
+  // data/dats/mnav_MSTR.json, mnav_MTPLF.json, mnav_SBET.json, mnav_BMNR.json, mnav_DFDV.json, mnav_UPXI.json
+  // Each: { "series": [ { "date": "YYYY-MM-DD", "mnav": <number> }, ... ] }
+
+  const FILES = {
     MSTR: "data/dats/mnav_MSTR.json",
     MTPLF:"data/dats/mnav_MTPLF.json",
     SBET: "data/dats/mnav_SBET.json",
@@ -832,8 +835,8 @@ window.__charts = {};
     UPXI: "data/dats/mnav_UPXI.json",
   };
 
-  // Hard start dates (filter everything before)
-  const MIN_START = {
+  // Hard starts you asked for
+  const STARTS = {
     MSTR: "2024-04-14",
     MTPLF:"2025-01-23",
     SBET: "2025-06-14",
@@ -842,187 +845,143 @@ window.__charts = {};
     UPXI: "2025-05-22",
   };
 
-  const datsState = new Map(); // symbol -> { chart, daily }
-
-  const asISO = (d) => (typeof d === "string" ? d : new Date(d * 1000).toISOString());
-
-  // Normalize Artemis-ish shapes into [{date, mnav}]
-  function normalizeMnavFromArtemis(json) {
-    const src = Array.isArray(json?.series) ? json.series : Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
-    const out = [];
-    for (const r of src) {
-      let dt = r?.date ?? r?.time ?? r?.t ?? r?.timestamp;
-      if (!dt) continue;
-      const iso = asISO(dt);
-
-      // Value priority: explicit mnav fields → derived ratios
-      let v = r?.mnav ?? r?.M_NAV ?? r?.mn_av ?? r?.value ?? r?.ratio;
-      if (v == null) {
-        const nav = r?.nav ?? r?.nav_usd ?? r?.nav_value;
-        const mcap = r?.market_cap ?? r?.mktcap ?? r?.mcap ?? r?.marketcap;
-        const price = r?.price ?? r?.close ?? r?.p;
-        const shares = r?.shares ?? r?.sh_out ?? r?.share_count;
-        if (mcap != null && nav != null && +nav !== 0) v = +mcap / +nav;
-        else if (price != null && shares != null && nav != null && +nav !== 0) v = (+price * +shares) / +nav;
-      }
-      if (v != null && isFinite(+v)) out.push({ date: iso, mnav: +v });
-    }
-    out.sort((a,b) => new Date(a.date) - new Date(b.date));
-    return out;
+  function normalize(raw){
+    const arr = Array.isArray(raw?.series) ? raw.series : (Array.isArray(raw) ? raw : []);
+    return arr
+      .map(r => ({ date: (typeof r.date==="string"?r.date:new Date(r.date*1000).toISOString()), mnav: +r.mnav }))
+      .filter(r => r.date && Number.isFinite(r.mnav))
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
   }
 
-  // Daily resample with forward fill
-  function toDaily(rows) {
-    if (!rows.length) return [];
-    const start = new Date(rows[0].date);
-    const end   = new Date(rows[rows.length-1].date);
-    const out = [];
-    let i = 0, last = rows[0].mnav;
-    for (let t = new Date(start); t <= end; t.setDate(t.getDate()+1)) {
-      const iso = new Date(t).toISOString().slice(0,10);
-      while (i < rows.length && new Date(rows[i].date) <= t) {
-        last = rows[i].mnav;
-        i++;
-      }
-      out.push({ date: iso, mnav: last });
-    }
-    return out;
+  function cropSince(series, isoStart){
+    if (!isoStart) return series;
+    const t0 = new Date(isoStart);
+    return series.filter(r => new Date(r.date) >= t0);
   }
 
-  function clipStart(rows, minISO) {
-    if (!minISO) return rows;
-    const min = new Date(minISO);
-    return rows.filter(r => new Date(r.date) >= min);
-  }
-
-  function filterRange(rows, token) {
-    if (!rows.length || token === "ALL") return rows;
-    const last = new Date(rows[rows.length-1].date);
+  function rangeFilter(series, token){
+    if (!series.length || token==="ALL") return series;
+    const last = new Date(series.at(-1).date);
     const back = new Date(last);
-    if (token === "1W") back.setDate(back.getDate()-7);
-    else if (token === "1M") back.setMonth(back.getMonth()-1);
-    else if (token === "3M") back.setMonth(back.getMonth()-3);
-    return rows.filter(r => new Date(r.date) >= back);
+    if (token==="3M") back.setMonth(back.getMonth()-3);
+    else if (token==="1M") back.setMonth(back.getMonth()-1);
+    else if (token==="1W") back.setDate(back.getDate()-7);
+    return series.filter(r => new Date(r.date) >= back);
   }
 
-  function pts(rows){ return rows.map(d => ({ x:new Date(d.date), y:d.mnav })); }
+  function toPts(rows){ return rows.map(d => ({ x: new Date(d.date), y: d.mnav })); }
 
-  async function loadDaily(symbol) {
-    const file = DAT_FILES[symbol];
-    if (!file) return [];
-    try {
-      const res = await fetch(file, { cache: "no-store" });
-      if (!res.ok) return [];
-      const json = await res.json();
-      const norm = normalizeMnavFromArtemis(json);
-      const clipped = clipStart(norm, MIN_START[symbol]);
-      return toDaily(clipped);
-    } catch (e) {
-      console.error("DAT Artemis fetch failed:", symbol, e);
-      return [];
-    }
+  function drawNoData(canvas, msg="No data"){
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.save();
+    ctx.fillStyle = "#666";
+    ctx.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(msg, canvas.width/2, canvas.height/2);
+    ctx.restore();
   }
 
-  function ensure1WChip(container) {
-    if (!container) return;
-    const has1w = container.querySelector('button[data-range="1W"]');
-    if (!has1w) {
-      const b = document.createElement("button");
-      b.className = "chip";
-      b.dataset.range = "1W";
-      b.textContent = "1W";
-      container.prepend(b);
-    }
-    // Make 1W the default 'on'
-    container.querySelectorAll("button").forEach(b => b.classList.remove("on"));
-    container.querySelector('button[data-range="1W"]')?.classList.add("on");
-  }
+  const state = new Map(); // symbol -> { chart, series }
 
-  async function buildOne(symbol) {
-    if (datsState.has(symbol)) return;
-
-    // canvases are named mnav-<SYMBOL>
+  async function initCard(symbol){
+    const path = FILES[symbol];
     const canvas = document.getElementById(`mnav-${symbol}`);
     if (!canvas) return;
 
-    // range chips are <div class="chips" data-for="mnav-<SYMBOL>">
-    const chips = document.querySelector(`.chips[data-for="mnav-${symbol}"]`);
-    ensure1WChip(chips);
+    let series = [];
+    try {
+      const res = await fetch(path, { cache:"no-store" });
+      if (!res.ok) throw new Error(`${path} ${res.status}`);
+      series = cropSince(normalize(await res.json()), STARTS[symbol]);
+    } catch (e) {
+      console.error("DATs fetch error", symbol, e);
+    }
 
-    const daily = await loadDaily(symbol);
-    if (!daily.length) return;
+    if (!series.length){
+      // show empty state but still wire chips so UI works later when data appears
+      drawNoData(canvas, "No data");
+      state.set(symbol, { chart: null, series: [] });
+      return;
+    }
 
-    const initial = filterRange(daily, "1W");
     const ctx = canvas.getContext("2d");
+    const initial = rangeFilter(series, "1W");
 
     const chart = new Chart(ctx, {
       type: "line",
-      data: {
-        datasets: [{
-          label: "mNAV",
-          data: pts(initial),
-          borderColor: "#111",
-          backgroundColor: "transparent",
-          pointRadius: 0,
-          borderWidth: 2,
-          tension: 0.25,
-          parsing: true,
-          spanGaps: true
-        }]
-      },
+      data: { datasets: [{
+        label: "mNAV",
+        data: toPts(initial),
+        borderColor: "#111",
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: .25,
+        parsing: true,
+        spanGaps: true
+      }]},
       options: {
-        maintainAspectRatio: false,
-        interaction: { mode: "index", axis: "x", intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            filter: (it) => Number.isFinite(it.parsed?.y),
-            callbacks: {
-              title: (items) => {
+        maintainAspectRatio:false,
+        interaction:{ mode:"index", axis:"x", intersect:false },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{
+            filter: it => Number.isFinite(it.parsed?.y),
+            callbacks:{
+              title: items => {
                 const ts = items[0].parsed.x ?? items[0].label;
-                return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
+                return new Intl.DateTimeFormat(undefined,{ timeZone:"America/New_York", year:"numeric", month:"short", day:"numeric" }).format(new Date(ts));
               },
-              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined, { maximumFractionDigits: 3 })}`
+              label: c => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined,{ maximumFractionDigits:3 })}`
             }
           }
         },
-        scales: {
-          x: {
-            type: "time",
-            time: { unit: "day" },
-            ticks: {
-              callback: (value, i, ticks) => {
-                const ts = ticks?.[i]?.value ?? value;
-                return fmtET(new Date(ts), { month:"short", day:"numeric" });
-              }
-            }
-          },
-          y: {
-            ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 }) }
-          }
+        scales:{
+          x:{ type:"time", time:{ unit:"day" },
+              ticks:{ callback:(v,i,ticks)=> {
+                const ts = ticks?.[i]?.value ?? v;
+                return new Intl.DateTimeFormat(undefined,{ timeZone:"America/New_York", month:"short", day:"numeric" }).format(new Date(ts));
+              }}},
+          y:{ ticks:{ callback:v => Number(v).toLocaleString(undefined,{ maximumFractionDigits:3 }) } }
         }
       }
     });
 
-    chips?.addEventListener("click", (e) => {
-      const btn = e.target.closest('button[data-range]');
+    state.set(symbol, { chart, series });
+  }
+
+  function wireChips(symbol){
+    const group = document.querySelector(`.chips[data-for="mnav-${symbol}"]`);
+    if (!group) return;
+    group.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip[data-range]");
       if (!btn) return;
-      chips.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
-      const subset = filterRange(daily, btn.dataset.range);
-      chart.data.datasets[0].data = pts(subset);
-      chart.update();
+      group.querySelectorAll(".chip").forEach(b => b.classList.toggle("on", b===btn));
+      const st = state.get(symbol);
+      const canvas = document.getElementById(`mnav-${symbol}`);
+      if (!st || !st.series.length){
+        drawNoData(canvas, "No data");
+        return;
+      }
+      const subset = rangeFilter(st.series, btn.dataset.range);
+      st.chart.data.datasets[0].data = toPts(subset);
+      st.chart.update();
     });
-
-    datsState.set(symbol, { chart, daily });
   }
 
-  async function initDats() {
-    await Promise.all(Object.keys(DAT_FILES).map(buildOne));
+  async function initAll(){
+    const symbols = Object.keys(FILES);
+    for (const s of symbols){
+      wireChips(s);
+      await initCard(s);
+    }
   }
 
-  // Initialize when tab is shown
-  document.addEventListener("open-dats", () => { initDats().catch(console.error); });
-  if ((location.hash || "").toLowerCase() === "#dats") {
-    document.addEventListener("DOMContentLoaded", () => { initDats().catch(console.error); });
+  // Initialize when the DATs tab is opened (and also if already on it)
+  document.addEventListener("open-dats", () => { initAll().catch(console.error); });
+  if ((location.hash||"").toLowerCase()==="#dats"){
+    document.addEventListener("DOMContentLoaded", () => { initAll().catch(console.error); });
   }
 })();
+
