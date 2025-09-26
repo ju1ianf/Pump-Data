@@ -413,38 +413,58 @@ window.__charts = {};
   };
 
   // ---------- CoinGecko integration (24H only for selected symbols) ----------
-  // Put your key on the page (before this file) with:
-  // <script>window.Polychain_GC_API='YOUR_KEY';</script>
+  // Add your key in index.html (optional):
+  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script>
   const CG_API_KEY = (typeof window !== "undefined" && window.Polychain_GC_API) ? window.Polychain_GC_API : "";
-  // Map symbols -> CoinGecko coin IDs (adjust any that differ)
+
+  // Map symbols -> CoinGecko IDs (adjust any that differ)
   const CG_IDS = {
-    HYPE:  "hyperliquid",       // verify
+    HYPE:  "hyperliquid",        // verify
     SOL:   "solana",
     ETH:   "ethereum",
     BTC:   "bitcoin",
     XAUT:  "tether-gold",
-    PUMP:  "pump",              // verify
-    BERA:  "bera",              // verify (or 'berachain' if needed)
-    IP:    "internet-computer", // change if your "IP" is different
+    PUMP:  "pump",               // verify
+    BERA:  "bera",               // verify
+    IP:    "internet-computer",  // change if your "IP" is different
     TAO:   "bittensor",
-    ETHFI: "ether-fi",          // sometimes 'ether-fi-token' — adjust if needed
-    MOVE:  "movement",          // verify
+    ETHFI: "ether-fi",           // sometimes 'ether-fi-token'
+    MOVE:  "movement",           // verify
   };
+
+  async function fetchCoinGeckoSeries(id) {
+    // try Pro; if it fails or key missing, fall back to public API
+    const proUrl = `https://pro-api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
+    const pubUrl = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
+
+    const headers = CG_API_KEY ? { "x-cg-pro-api-key": CG_API_KEY } : undefined;
+
+    async function tryUrl(url, hdrs) {
+      const res = await fetch(url, { headers: hdrs, cache: "no-store" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const prices = Array.isArray(json?.prices) ? json.prices : [];
+      const series = prices
+        .map(([ms, p]) => ({ t: new Date(ms), p: +p }))
+        .filter(d => Number.isFinite(d.p))
+        .sort((a,b) => a.t - b.t);
+      return series.length >= 2 ? series : null;
+    }
+
+    // prefer Pro when key exists
+    if (CG_API_KEY) {
+      const s = await tryUrl(proUrl, headers);
+      if (s) return s;
+    }
+    // public fallback
+    return await tryUrl(pubUrl, undefined);
+  }
 
   async function fetchCG24H(symbol) {
     const id = CG_IDS[symbol];
     if (!id) return null;
-    const url = `https://pro-api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
-    const headers = CG_API_KEY ? { "x-cg-pro-api-key": CG_API_KEY } : {};
     try {
-      const res = await fetch(url, { headers, cache: "no-store" });
-      if (!res.ok) throw new Error(`CoinGecko ${symbol} ${res.status}`);
-      const json = await res.json();
-      const prices = Array.isArray(json?.prices) ? json.prices : [];
-      return prices
-        .map(([ms, p]) => ({ t: new Date(ms), p: +p }))
-        .filter(d => Number.isFinite(d.p))
-        .sort((a,b) => a.t - b.t);
+      return await fetchCoinGeckoSeries(id);
     } catch (e) {
       console.error("CG fetch failed:", symbol, e);
       return null;
@@ -550,7 +570,7 @@ window.__charts = {};
   }
   function colorFor(sym) { let h=0; for (let i=0;i<sym.length;i++) h=(h*31+sym.charCodeAt(i))>>>0; return `hsl(${h%360} 70% 45%)`; }
 
-  // Central loader: 24H for selected symbols via CG, otherwise Artemis
+  // Central loader: 24H for selected symbols via CoinGecko, otherwise Artemis
   async function getSeries(symbol, path) {
     const key = `${symbol}:${state.range}`;
     if (state.cache.has(key)) return state.cache.get(key);
@@ -558,7 +578,7 @@ window.__charts = {};
     let series = null;
     const useCG = (state.range === "24H") && !!CG_IDS[symbol];
     if (useCG) {
-      series = await fetchCG24H(symbol);
+      series = await fetchCG24H(symbol); // Pro -> Public -> null
     }
     if (!series) {
       try {
@@ -772,6 +792,8 @@ window.__charts = {};
       (btn.closest(".range-switch") || document)
         .querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
       state.range = btn.dataset.range;
+
+      // NOTE: cache is keyed by range, so no need to purge; new keys will be filled automatically
       renderTable();
       updateRelPerfChart();
     });
