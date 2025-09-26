@@ -537,6 +537,7 @@ window.__charts = {};
     return dedup;
   }
 
+  // ★ FIXED: use latest-on-or-before for baseline, for ALL ranges (esp. 24H)
   function computePctChange(series, range, nowUTC = new Date()) {
     if (!series?.length) return null;
     const end = series.at(-1)?.p;
@@ -554,13 +555,9 @@ window.__charts = {};
       baselineTs = new Date(d0.getTime() - back * MS_DAY).getTime();
     }
 
-    let lo = 0, hi = series.length - 1, ans = -1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (series[mid].t.getTime() >= baselineTs) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
-    }
-    const start = (ans !== -1) ? series[ans].p : series[0].p;
+    const start = latestOnOrBeforeTs(series, baselineTs) ?? series[0]?.p;
     if (start == null || start <= 0) return null;
+
     return ((end - start) / start) * 100;
   }
 
@@ -618,15 +615,21 @@ window.__charts = {};
     });
   }
 
+  // ★ FIXED: forward-fill within the window so 24H starts exactly 24h ago
   function buildRelativePoints(series, boundaries) {
     if (!series?.length || !boundaries.length) return [];
-    const baselinePx = latestOnOrBeforeTs(series, boundaries[0].getTime()) ?? series[0].p;
+    const firstPx   = series[0].p;
+    const baselinePx =
+      latestOnOrBeforeTs(series, boundaries[0].getTime()) ?? firstPx;
     if (!(baselinePx > 0)) return [];
+
     const pts = [];
+    let lastPx = null;
     for (const t of boundaries) {
       const px = latestOnOrBeforeTs(series, t.getTime());
-      if (px == null) continue;
-      const ret = ((px / baselinePx) - 1) * 100;
+      if (px != null) lastPx = px;
+      const usePx = (lastPx != null) ? lastPx : firstPx;
+      const ret = ((usePx / baselinePx) - 1) * 100;
       pts.push({ x: t, y: ret });
     }
     return pts;
