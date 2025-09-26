@@ -407,9 +407,49 @@ window.__charts = {};
   const state = {
     range: "YTD",          // default
     assetsIndex: null,
-    cache: new Map(),      // symbol -> [{t: Date, p: number}]
+    // cache key = `${symbol}:${range}` -> [{t: Date, p: number}]
+    cache: new Map(),
     initialized: false,
   };
+
+  // ---------- CoinGecko integration (24H only for selected symbols) ----------
+  // Put your key on the page (before this file) with:
+  // <script>window.Polychain_GC_API='YOUR_KEY';</script>
+  const CG_API_KEY = (typeof window !== "undefined" && window.Polychain_GC_API) ? window.Polychain_GC_API : "";
+  // Map symbols -> CoinGecko coin IDs (adjust any that differ)
+  const CG_IDS = {
+    HYPE:  "hyperliquid",       // verify
+    SOL:   "solana",
+    ETH:   "ethereum",
+    BTC:   "bitcoin",
+    XAUT:  "tether-gold",
+    PUMP:  "pump",              // verify
+    BERA:  "bera",              // verify (or 'berachain' if needed)
+    IP:    "internet-computer", // change if your "IP" is different
+    TAO:   "bittensor",
+    ETHFI: "ether-fi",          // sometimes 'ether-fi-token' — adjust if needed
+    MOVE:  "movement",          // verify
+  };
+
+  async function fetchCG24H(symbol) {
+    const id = CG_IDS[symbol];
+    if (!id) return null;
+    const url = `https://pro-api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
+    const headers = CG_API_KEY ? { "x-cg-pro-api-key": CG_API_KEY } : {};
+    try {
+      const res = await fetch(url, { headers, cache: "no-store" });
+      if (!res.ok) throw new Error(`CoinGecko ${symbol} ${res.status}`);
+      const json = await res.json();
+      const prices = Array.isArray(json?.prices) ? json.prices : [];
+      return prices
+        .map(([ms, p]) => ({ t: new Date(ms), p: +p }))
+        .filter(d => Number.isFinite(d.p))
+        .sort((a,b) => a.t - b.t);
+    } catch (e) {
+      console.error("CG fetch failed:", symbol, e);
+      return null;
+    }
+  }
 
   function startOfDayUTC(d) {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -510,6 +550,30 @@ window.__charts = {};
   }
   function colorFor(sym) { let h=0; for (let i=0;i<sym.length;i++) h=(h*31+sym.charCodeAt(i))>>>0; return `hsl(${h%360} 70% 45%)`; }
 
+  // Central loader: 24H for selected symbols via CG, otherwise Artemis
+  async function getSeries(symbol, path) {
+    const key = `${symbol}:${state.range}`;
+    if (state.cache.has(key)) return state.cache.get(key);
+
+    let series = null;
+    const useCG = (state.range === "24H") && !!CG_IDS[symbol];
+    if (useCG) {
+      series = await fetchCG24H(symbol);
+    }
+    if (!series) {
+      try {
+        const res = await fetch(path, { cache: "no-store" });
+        const raw = await res.json();
+        series = normalizeSeries(raw);
+      } catch (e) {
+        console.error("Artemis fetch failed:", symbol, e);
+        series = [];
+      }
+    }
+    state.cache.set(key, series);
+    return series;
+  }
+
   const rel = {
     selected: new Set(["HYPE","SOL","ETH","BTC","PUMP"]),
     chart: null,
@@ -534,17 +598,6 @@ window.__charts = {};
     });
   }
 
-  async function ensureSeries(symbol, path) {
-    let s = state.cache.get(symbol);
-    if (!s) {
-      const res = await fetch(path, { cache: "no-store" });
-      const raw = await res.json();
-      s = normalizeSeries(raw);
-      state.cache.set(symbol, s);
-    }
-    return s;
-  }
-
   function buildRelativePoints(series, boundaries) {
     if (!series?.length || !boundaries.length) return [];
     const baselinePx = latestOnOrBeforeTs(series, boundaries[0].getTime()) ?? series[0].p;
@@ -559,7 +612,7 @@ window.__charts = {};
     return pts;
   }
 
-  // === Relative Performance chart (with tooltip sorted by performance) ===
+  // === Relative Performance chart (leader-first tooltip) ===
   async function updateRelPerfChart() {
     const canvas = document.getElementById("relperf-chart");
     if (!canvas || !state.assetsIndex) return;
@@ -570,7 +623,7 @@ window.__charts = {};
     const datasets = [];
     for (const a of state.assetsIndex.assets) {
       if (!rel.selected.has(a.symbol)) continue;
-      const series = await ensureSeries(a.symbol, a.path);
+      const series = await getSeries(a.symbol, a.path);
       const points = buildRelativePoints(series, boundaries);
       if (!points.length) continue;
 
@@ -597,11 +650,10 @@ window.__charts = {};
         minute: xUnit === "hour" ? "2-digit" : undefined
       });
 
-    // NEW: sort tooltip items by y DESC (leader first) and hide NaNs
     const tooltipItemSort = (a, b) => {
       const ya = Number.isFinite(a.parsed?.y) ? a.parsed.y : -Infinity;
       const yb = Number.isFinite(b.parsed?.y) ? b.parsed.y : -Infinity;
-      return yb - ya;
+      return yb - ya; // leader first
     };
     const tooltipFilter = (item) => Number.isFinite(item.parsed?.y);
 
@@ -651,12 +703,9 @@ window.__charts = {};
     } else {
       rel.chart.data.datasets = datasets;
       rel.chart.options.scales.x.time.unit = xUnit;
-
-      // keep sorting behavior on updates as well
       const tt = rel.chart.options.plugins.tooltip;
       tt.itemSort = tooltipItemSort;
       tt.filter = tooltipFilter;
-
       rel.chart.update();
     }
   }
@@ -671,28 +720,21 @@ window.__charts = {};
     const now = new Date();
 
     for (const a of state.assetsIndex.assets) {
-      let series = state.cache.get(a.symbol);
-      if (!series) {
-        try {
-          const res = await fetch(a.path, { cache: "no-store" });
-          const raw = await res.json();
-          series = normalizeSeries(raw);
-          state.cache.set(a.symbol, series);
-        } catch (e) {
-          console.error("Performance load failed:", a.symbol, e);
-          continue;
-        }
-      }
-      if (!series.length) continue;
+      try {
+        const series = await getSeries(a.symbol, a.path);
+        if (!series.length) continue;
 
-      const latest = series.at(-1);
-      const pct = computePctChange(series, state.range, now);
-      rows.push({
-        symbol: a.symbol,
-        name: a.name ?? a.symbol,
-        price: latest.p,
-        changePct: pct
-      });
+        const latest = series.at(-1);
+        const pct = computePctChange(series, state.range, now);
+        rows.push({
+          symbol: a.symbol,
+          name: a.name ?? a.symbol,
+          price: latest.p,
+          changePct: pct
+        });
+      } catch (e) {
+        console.error("Performance row failed:", a.symbol, e);
+      }
     }
 
     rows.sort((a, b) => (b.changePct ?? -Infinity) - (a.changePct ?? -Infinity));
@@ -761,4 +803,3 @@ window.__charts = {};
     }
   });
 })();
-
