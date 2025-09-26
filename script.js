@@ -413,8 +413,7 @@ window.__charts = {};
   };
 
   // ---------- CoinGecko integration (24H only for selected symbols) ----------
-  // Add your key in index.html (optional):
-  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script>
+  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script> in index.html (optional)
   const CG_API_KEY = (typeof window !== "undefined" && window.Polychain_GC_API) ? window.Polychain_GC_API : "";
 
   // Map symbols -> CoinGecko IDs (adjust any that differ)
@@ -426,10 +425,10 @@ window.__charts = {};
     XAUT:  "tether-gold",
     PUMP:  "pump",
     BERA:  "bera",
-    IP:    "internet-computer",  // change if your "IP" is different
+    IP:    "internet-computer", // Story Protocol ticker in your table
     TAO:   "bittensor",
-    ETHFI: "ether-fi",           // sometimes 'ether-fi-token'
-    MOVE:  "movement",           // verify
+    ETHFI: "ether-fi",
+    MOVE:  "movement",
   };
 
   async function fetchCoinGeckoSeries(id) {
@@ -533,7 +532,6 @@ window.__charts = {};
     return dedup;
   }
 
-  // ★ FIXED: use latest-on-or-before for baseline, for ALL ranges (esp. 24H)
   function computePctChange(series, range, nowUTC = new Date()) {
     if (!series?.length) return null;
     const end = series.at(-1)?.p;
@@ -611,7 +609,6 @@ window.__charts = {};
     });
   }
 
-  // ★ FIXED: forward-fill within the window so 24H starts exactly 24h ago
   function buildRelativePoints(series, boundaries) {
     if (!series?.length || !boundaries.length) return [];
     const firstPx   = series[0].p;
@@ -826,21 +823,20 @@ window.__charts = {};
 
 /* =================== DATs (mNAV) module =================== */
 (() => {
-  // Adjust the file paths to match your Artemis outputs (JSON time series).
-  // Expected JSON: { "series": [ { "date": "...", "mnav": 1.23 } ... ] }
-  // If your key is "M_NAV", we'll pick that up automatically.
-  const CARDS = [
-    { symbol: "MSTR", title: "MSTR — mNAV", file: "data/dats/mnav_MSTR.json" },
-    { symbol: "MTPLF", title: "MTPLF — mNAV", file: "data/dats/mnav_MTPLF.json" },
-    { symbol: "SBET", title: "SBET — mNAV", file: "data/dats/mnav_SBET.json" },
-    { symbol: "BMNR", title: "BMNR — mNAV", file: "data/dats/mnav_BMNR.json" },
-    { symbol: "DFDV", title: "DFDV — mNAV", file: "data/dats/mnav_DFDV.json" },
-    { symbol: "UPXI", title: "UPXI — mNAV", file: "data/dats/mnav_UPXI.json" },
+  // Canvas IDs below must match the IDs in index.html
+  // Files must exist in /data/dats/*.json (add via GitHub UI).
+  const SERIES = [
+    { id: "mnav-MSTR", file: "data/dats/mnav_MSTR.json" },
+    { id: "mnav-MTPLF", file: "data/dats/mnav_MTPLF.json" },
+    { id: "mnav-SBET", file: "data/dats/mnav_SBET.json" },
+    { id: "mnav-BMNR", file: "data/dats/mnav_BMNR.json" },
+    { id: "mnav-DFDV", file: "data/dats/mnav_DFDV.json" },
+    { id: "mnav-UPXI", file: "data/dats/mnav_UPXI.json" },
   ];
 
-  const datsState = {
+  const state = {
     inited: false,
-    charts: new Map(),  // symbol -> { chart, series }
+    charts: new Map(),   // canvasId -> { chart, series }
   };
 
   function normalizeMnav(raw) {
@@ -850,88 +846,63 @@ window.__charts = {};
       const d = r.date ?? r.t ?? r.time ?? r.timestamp;
       const v = r.mnav ?? r.M_NAV ?? r.value ?? r.v;
       if (!d || v == null || Number.isNaN(+v)) continue;
-
-      // Coerce date to ISO-like string so new Date(...) is safe
-      const iso = typeof d === "string" ? d : new Date(d * 1000).toISOString();
+      const iso = (typeof d === "string") ? d : new Date(d * 1000).toISOString();
       out.push({ date: iso, mnav: +v });
     }
     out.sort((a,b) => new Date(a.date) - new Date(b.date));
     return out;
   }
 
-  function filterMnavRange(series, token) {
+  function filterRange(series, token) {
     if (!series.length || token === "ALL") return series;
     const last = new Date(series[series.length - 1].date);
     const back = new Date(last);
     if (token === "3M") back.setMonth(back.getMonth() - 3);
-    else /* 1M default */ back.setMonth(back.getMonth() - 1);
+    else back.setMonth(back.getMonth() - 1); // 1M default
     return series.filter(r => new Date(r.date) >= back);
   }
 
-  function mnavPts(rows) {
+  function toMnavPts(rows) {
     return rows.map(d => ({ x: new Date(d.date), y: d.mnav }));
   }
 
-  function makeCard({ symbol, title }) {
-    const card = document.createElement("div");
-    card.className = "dat-card";
-    card.id = `dat-${symbol}`;
+  async function buildOne({ id, file }) {
+    if (state.charts.has(id)) return;
 
-    card.innerHTML = `
-      <div class="dat-head">
-        <div class="dat-title">${title}</div>
-        <div class="dat-rng" role="group" aria-label="Range">
-          <button class="on" data-range="1M">1M</button>
-          <button data-range="3M">3M</button>
-          <button data-range="ALL">All</button>
-        </div>
-      </div>
-      <canvas class="dat-canvas" id="dat-canvas-${symbol}"></canvas>
-      <div class="dat-note">mNAV = (Price × Shares) ÷ NAV</div>
-    `;
-    return card;
-  }
-
-  async function buildChart(cfg) {
-    // Already built?
-    if (datsState.charts.has(cfg.symbol)) return;
-
-    // Fetch & normalize
-    let raw;
+    // fetch + normalize
+    let json;
     try {
-      const res = await fetch(cfg.file, { cache: "no-store" });
-      raw = await res.json();
+      const res = await fetch(file, { cache: "no-store" });
+      json = await res.json();
     } catch (e) {
-      console.error("DAT fetch failed:", cfg.symbol, e);
+      console.error("mNAV fetch failed:", id, e);
       return;
     }
-    const series = normalizeMnav(raw);
+    const series = normalizeMnav(json);
     if (!series.length) return;
 
-    // Default range = 1M
-    const initial = filterMnavRange(series, "1M");
-
-    const canvas = document.getElementById(`dat-canvas-${cfg.symbol}`);
+    const canvas = document.getElementById(id);
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
+    // default 1M
+    const initial = filterRange(series, "1M");
+
     const chart = new Chart(ctx, {
       type: "line",
-      data: {
-        datasets: [{
-          label: "mNAV",
-          data: mnavPts(initial),
-          borderColor: "#111",
-          backgroundColor: "transparent",
-          pointRadius: 0,
-          borderWidth: 2,
-          tension: 0.25,
-          parsing: true,
-          spanGaps: true
-        }]
-      },
+      data: { datasets: [{
+        label: "mNAV",
+        data: toMnavPts(initial),
+        borderColor: "#111",
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.25,
+        parsing: true,
+        spanGaps: true
+      }]},
       options: {
-        maintainAspectRatio: false,
+        maintainAspectRatio: false, // uses the fixed-height .dat-frame
         interaction: { mode: "index", axis: "x", intersect: false },
         plugins: {
           legend: { display: false },
@@ -942,7 +913,7 @@ window.__charts = {};
                 const ts = items[0].parsed.x ?? items[0].label;
                 return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
               },
-              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined, { maximumFractionDigits: 3 })}`
+              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined,{ maximumFractionDigits: 3 })}`
             }
           }
         },
@@ -958,53 +929,45 @@ window.__charts = {};
             }
           },
           y: {
-            ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 }) }
+            ticks: { callback: v => Number(v).toLocaleString(undefined,{ maximumFractionDigits: 3 }) }
           }
         }
       }
     });
 
-    // Wire range buttons for this card
-    const rng = document.querySelector(`#dat-${cfg.symbol} .dat-rng`);
-    rng?.addEventListener("click", (e) => {
+    // wire chips for this chart
+    const chips = document.querySelector(`.chips[data-for="${id}"]`);
+    chips?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-range]");
       if (!btn) return;
-      rng.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
-      const token = btn.dataset.range;
-      const subset = filterMnavRange(series, token);
-      chart.data.datasets[0].data = mnavPts(subset);
+      chips.querySelectorAll(".chip").forEach(b => b.classList.toggle("on", b === btn));
+      const subset = filterRange(series, btn.dataset.range);
+      chart.data.datasets[0].data = toMnavPts(subset);
       chart.update();
     });
 
-    datsState.charts.set(cfg.symbol, { chart, series });
+    state.charts.set(id, { chart, series });
   }
 
-  async function initDats() {
-    if (datsState.inited) return;
-    datsState.inited = true;
-    const grid = document.getElementById("dats-grid");
-    if (!grid) return;
-
-    // Build cards
-    for (const cfg of CARDS) {
-      grid.appendChild(makeCard(cfg));
-    }
-    // Build charts (sequential keeps bandwidth tame; feel free to Promise.all)
-    for (const cfg of CARDS) {
-      await buildChart(cfg);
+  async function init() {
+    if (state.inited) return;
+    state.inited = true;
+    for (const cfg of SERIES) {
+      await buildOne(cfg);
     }
   }
 
-  // Lazy-init when the DATs tab is shown
+  // Lazy init when the tab becomes visible
   document.addEventListener("open-dats", () => {
-    initDats().catch(e => console.error("DATs init error:", e));
+    init().catch(e => console.error("DATs init error:", e));
   });
 
-  // If user lands directly on #dats with a hard refresh
+  // If the page loads directly on #dats
   if ((location.hash || "").toLowerCase() === "#dats") {
     document.addEventListener("DOMContentLoaded", () => {
-      initDats().catch(e => console.error("DATs init error:", e));
+      init().catch(e => console.error("DATs init error:", e));
     });
   }
 })();
+
 
