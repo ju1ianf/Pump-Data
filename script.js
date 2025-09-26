@@ -407,15 +407,11 @@ window.__charts = {};
   const state = {
     range: "YTD",          // default
     assetsIndex: null,
-    // cache key = `${symbol}:${range}` -> [{t: Date, p: number}]
     cache: new Map(),
     initialized: false,
   };
 
-  // CoinGecko Pro key (optional) set in index.html:
-  // <script>window.Polychain_GC_API='YOUR_CG_PRO_KEY';</script>
   const CG_API_KEY = (typeof window !== "undefined" && window.Polychain_GC_API) ? window.Polychain_GC_API : "";
-
   const CG_IDS = {
     HYPE:  "hyperliquid",
     SOL:   "solana",
@@ -475,22 +471,22 @@ window.__charts = {};
   function buildBoundaries(range, nowUTC = new Date()) {
     if (range === "24H") {
       const end = floorHourUTC(nowUTC);
-      const start = new Date(end.getTime() - 24 * MS_HOUR);
+      const start = new Date(end.getTime() - 24 * (60*60*1000));
       const out = [];
-      for (let t = start.getTime(); t <= end.getTime(); t += MS_HOUR) out.push(new Date(t));
+      for (let t = start.getTime(); t <= end.getTime(); t += (60*60*1000)) out.push(new Date(t));
       return out;
     }
     const now = startOfDayUTC(nowUTC);
     let start;
     switch (range) {
-      case "1W": start = new Date(now.getTime() - 7 * MS_DAY); break;
-      case "1M": start = new Date(now.getTime() - 30 * MS_DAY); break;
-      case "3M": start = new Date(now.getTime() - 90 * MS_DAY); break;
+      case "1W": start = new Date(now.getTime() - 7 * (24*60*60*1000)); break;
+      case "1M": start = new Date(now.getTime() - 30 * (24*60*60*1000)); break;
+      case "3M": start = new Date(now.getTime() - 90 * (24*60*60*1000)); break;
       case "YTD": start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1)); break;
-      default:   start = new Date(now.getTime() - 30 * MS_DAY);
+      default:   start = new Date(now.getTime() - 30 * (24*60*60*1000));
     }
     const out = [];
-    for (let t = start.getTime(); t <= now.getTime(); t += MS_DAY) out.push(new Date(t));
+    for (let t = start.getTime(); t <= now.getTime(); t += (24*60*60*1000)) out.push(new Date(t));
     return out;
   }
 
@@ -538,14 +534,14 @@ window.__charts = {};
 
     let baselineTs;
     if (range === "24H") {
-      baselineTs = new Date(floorHourUTC(nowUTC).getTime() - 24 * MS_HOUR).getTime();
+      baselineTs = new Date(floorHourUTC(nowUTC).getTime() - 24 * (60*60*1000)).getTime();
     } else if (range === "YTD") {
       const y = nowUTC.getUTCFullYear();
       baselineTs = Date.UTC(y, 0, 1);
     } else {
       const d0 = startOfDayUTC(nowUTC);
       const back = { "1W":7, "1M":30, "3M":90 }[range] ?? 30;
-      baselineTs = new Date(d0.getTime() - back * MS_DAY).getTime();
+      baselineTs = new Date(d0.getTime() - back * (24*60*60*1000)).getTime();
     }
 
     const start = latestOnOrBeforeTs(series, baselineTs) ?? series[0]?.p;
@@ -813,47 +809,52 @@ window.__charts = {};
 
 /* =================== DATs (mNAV) module =================== */
 (() => {
-  // The canvases must exist in HTML with these IDs (one per card).
-  const SERIES = [
-    { id: "mnav-MSTR", file: "data/dats/mnav_MSTR.json" },
-    { id: "mnav-MTPLF", file: "data/dats/mnav_MTPLF.json" },
-    { id: "mnav-SBET", file: "data/dats/mnav_SBET.json" },
-    { id: "mnav-BMNR", file: "data/dats/mnav_BMNR.json" },
-    { id: "mnav-DFDV", file: "data/dats/mnav_DFDV.json" },
-    { id: "mnav-UPXI", file: "data/dats/mnav_UPXI.json" },
+  // Files & IDs (script builds the cards for you; HTML has <div id="dats-grid">)
+  const CARDS = [
+    { symbol: "MSTR", title: "MSTR — mNAV", file: "data/dats/mnav_MSTR.json" },
+    { symbol: "MTPLF", title: "MTPLF — mNAV", file: "data/dats/mnav_MTPLF.json" },
+    { symbol: "SBET", title: "SBET — mNAV", file: "data/dats/mnav_SBET.json" },
+    { symbol: "BMNR", title: "BMNR — mNAV", file: "data/dats/mnav_BMNR.json" },
+    { symbol: "DFDV", title: "DFDV — mNAV", file: "data/dats/mnav_DFDV.json" },
+    { symbol: "UPXI", title: "UPXI — mNAV", file: "data/dats/mnav_UPXI.json" },
   ];
+
+  // Force chart start dates (UTC) per your request
+  const STARTS = {
+    MSTR: "2024-04-14",
+    MTPLF:"2025-01-23",
+    SBET: "2025-06-14",
+    BMNR: "2025-06-14",
+    DFDV: "2025-05-22",
+    UPXI: "2025-05-22",
+  };
 
   const datsState = { inited:false, charts:new Map() };
 
-  // ---- helpers to build DAILY mNAV safely ----
-  function num(x){ const n=+x; return Number.isFinite(n)?n:null; }
   function lcKeys(obj){ const out={}; for(const k in obj){ out[k.toLowerCase()]=obj[k]; } return out; }
-
-  // pick a numeric by trying multiple key aliases
   function pick(obj, names){
-    for(const n of names){
+    for (const n of names) {
       if (obj[n] != null && Number.isFinite(+obj[n])) return +obj[n];
     }
     return null;
   }
 
-  // convert any timeseries payload to [{date:<ISO>, mnav:<number>}], DAILY
-  function normalizeDailyMnav(payload){
+  // Normalize arbitrary payload to [{date:ISO, mnav:number}] (NOT yet daily)
+  function normalizeMnav(payload){
     const rows = Array.isArray(payload?.series) ? payload.series
                : Array.isArray(payload) ? payload
                : Array.isArray(payload?.data) ? payload.data
                : [];
-
-    const tmp = [];
-    for(const r0 of rows){
+    const out = [];
+    for (const r0 of rows){
       const r = lcKeys(r0);
       const dRaw = r.date ?? r.t ?? r.time ?? r.timestamp;
       if (dRaw == null) continue;
-      const iso = (typeof dRaw==="string") ? dRaw : new Date(dRaw*1000).toISOString();
+      const iso = (typeof dRaw === "string") ? dRaw : new Date(dRaw*1000).toISOString();
 
-      // preferred: explicit mnav
+      // 1) direct mnav
       let mnav = pick(r, ["mnav","m_nav","ratio"]);
-      // fallback: price*shares/nav
+      // 2) compute from price*shares/nav
       if (mnav == null){
         const price = pick(r, ["price","px","close","c","p"]);
         const shares= pick(r, ["shares","sh_out","shout","shares_outstanding","float"]);
@@ -862,25 +863,44 @@ window.__charts = {};
         if (price!=null && shares!=null && nav!=null && nav!==0) mnav = (price*shares)/nav;
         else if (mcap!=null && nav!=null && nav!==0) mnav = mcap/nav;
       }
-
-      // guard: some feeds accidentally drop market cap into mnav; try to reject absurd values
-      if (mnav != null && !Number.isFinite(mnav)) mnav = null;
-
-      if (mnav != null) tmp.push({ date: iso, mnav: +mnav });
+      if (mnav != null && Number.isFinite(mnav)) out.push({ date: iso, mnav: +mnav });
     }
-
-    // group by UTC day -> take the latest point (daily)
-    tmp.sort((a,b)=> new Date(a.date) - new Date(b.date));
-    const byDay = new Map(); // YYYY-MM-DD -> last row
-    for (const r of tmp){
-      const d = new Date(r.date);
-      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
-      byDay.set(key, r); // keep the last seen for that day
-    }
-    return Array.from(byDay.values());
+    out.sort((a,b)=> new Date(a.date) - new Date(b.date));
+    return out;
   }
 
-  function filterRange(series, token) {
+  // Collapse to DAILY (keep last per day), then forward-fill on a daily grid
+  function toDailyForwardFilled(rows, startISO){
+    if (!rows.length) return [];
+    // Collapse to one point per UTC day (take the latest)
+    const byDay = new Map(); // YYYY-MM-DD -> value
+    for (const r of rows){
+      const d = new Date(r.date);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+      byDay.set(key, r.mnav);
+    }
+    const firstKey = Array.from(byDay.keys())[0];
+    const lastKey  = Array.from(byDay.keys()).at(-1);
+
+    const start = new Date(startISO ? `${startISO}T00:00:00Z` : `${firstKey}T00:00:00Z`);
+    const first = new Date(`${firstKey}T00:00:00Z`);
+    const end   = new Date(`${lastKey}T00:00:00Z`);
+
+    // Use first known value to fill from requested start until first data point
+    let lastVal = byDay.get(firstKey);
+
+    const out = [];
+    for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
+      const d = new Date(t);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+      const v = byDay.has(key) ? byDay.get(key) : lastVal;
+      if (byDay.has(key)) lastVal = v; // advance carry
+      out.push({ date: d.toISOString(), mnav: v });
+    }
+    return out;
+  }
+
+  function filterMnavRange(series, token) {
     if (!series.length || token === "ALL") return series;
     const last = new Date(series[series.length - 1].date);
     const back = new Date(last);
@@ -890,48 +910,75 @@ window.__charts = {};
     return series.filter(r => new Date(r.date) >= back);
   }
 
-  const toPtsMnav = (rows) => rows.map(d => ({ x:new Date(d.date), y:d.mnav }));
+  const mnavPts = (rows) => rows.map(d => ({ x: new Date(d.date), y: d.mnav }));
 
-  async function buildChart({ id, file }) {
-    if (datsState.charts.has(id)) return;
+  function makeCard({ symbol, title }) {
+    const card = document.createElement("div");
+    card.className = "dat-card";
+    card.id = `dat-${symbol}`;
 
-    // fetch + normalize -> DAILY mNAV
+    card.innerHTML = `
+      <div class="dat-head">
+        <div class="dat-title">${title}</div>
+        <div class="dat-rng" role="group" aria-label="Range">
+          <button class="on" data-range="1W">1W</button>
+          <button data-range="1M">1M</button>
+          <button data-range="3M">3M</button>
+          <button data-range="ALL">All</button>
+        </div>
+      </div>
+      <canvas class="dat-canvas" id="dat-canvas-${symbol}"></canvas>
+      <div class="dat-note">mNAV = (Price × Shares) ÷ NAV (daily, forward-filled)</div>
+    `;
+    return card;
+  }
+
+  async function buildChart(cfg) {
+    if (datsState.charts.has(cfg.symbol)) return;
+
     let raw;
     try {
-      const res = await fetch(file, { cache:"no-store" });
+      const res = await fetch(cfg.file, { cache: "no-store" });
       raw = await res.json();
-    } catch(e){
-      console.error("DAT fetch failed:", id, e);
+    } catch (e) {
+      console.error("DAT fetch failed:", cfg.symbol, e);
       return;
     }
-    const daily = normalizeDailyMnav(raw);
-    if (!daily.length) return;
 
-    // Default range 1W
-    const initial = filterRange(daily, "1W");
+    const normalized = normalizeMnav(raw);
+    if (!normalized.length) return;
 
-    const cnv = document.getElementById(id);
-    if (!cnv) return;
-    const ctx = cnv.getContext("2d");
+    // Force start date & create DAILY forward-filled grid
+    const startISO = STARTS[cfg.symbol] || null;
+    const daily = toDailyForwardFilled(normalized, startISO);
+
+    // Default = 1W
+    const initial = filterMnavRange(daily, "1W");
+
+    const canvas = document.getElementById(`dat-canvas-${cfg.symbol}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
 
     const chart = new Chart(ctx, {
       type: "line",
-      data: { datasets: [{
-        label: "mNAV",
-        data: toPtsMnav(initial),
-        borderColor: "#111",
-        backgroundColor: "transparent",
-        pointRadius: 0,
-        borderWidth: 2,
-        tension: 0.25,
-        parsing: true,
-        spanGaps: true
-      }]},
+      data: {
+        datasets: [{
+          label: "mNAV",
+          data: mnavPts(initial),
+          borderColor: "#111",
+          backgroundColor: "transparent",
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.25,
+          parsing: true,
+          spanGaps: true
+        }]
+      },
       options: {
-        maintainAspectRatio: false, // canvas height is controlled by CSS
-        interaction: { mode:"index", axis:"x", intersect:false },
+        maintainAspectRatio: false,
+        interaction: { mode: "index", axis: "x", intersect: false },
         plugins: {
-          legend: { display:false },
+          legend: { display: false },
           tooltip: {
             filter: (item) => Number.isFinite(item.parsed?.y),
             callbacks: {
@@ -939,7 +986,7 @@ window.__charts = {};
                 const ts = items[0].parsed.x ?? items[0].label;
                 return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
               },
-              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined,{ maximumFractionDigits: 4 })}`
+              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
             }
           }
         },
@@ -955,37 +1002,47 @@ window.__charts = {};
             }
           },
           y: {
-            ticks: { callback: v => Number(v).toLocaleString(undefined,{ maximumFractionDigits: 4 }) }
+            ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 }) }
           }
         }
       }
     });
 
-    // Range chips for this chart (now include 1W)
-    const chips = document.querySelector(`.chips[data-for="${id}"]`);
-    chips?.addEventListener("click", (e) => {
+    // Wire range buttons (now includes 1W)
+    const rng = document.querySelector(`#dat-${cfg.symbol} .dat-rng`);
+    rng?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-range]");
       if (!btn) return;
-      chips.querySelectorAll(".chip").forEach(b => b.classList.toggle("on", b === btn));
-      const subset = filterRange(daily, btn.dataset.range);
-      chart.data.datasets[0].data = toPtsMnav(subset);
+      rng.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+      const token = btn.dataset.range;
+      const subset = filterMnavRange(daily, token);
+      chart.data.datasets[0].data = mnavPts(subset);
       chart.update();
     });
 
-    datsState.charts.set(id, { chart, series: daily });
+    datsState.charts.set(cfg.symbol, { chart, series: daily });
   }
 
-  async function initDats(){
+  async function initDats() {
     if (datsState.inited) return;
     datsState.inited = true;
-    for (const cfg of SERIES) await buildChart(cfg);
+    const grid = document.getElementById("dats-grid");
+    if (!grid) return;
+
+    // Build cards
+    for (const cfg of CARDS) grid.appendChild(makeCard(cfg));
+    // Build charts
+    for (const cfg of CARDS) await buildChart(cfg);
   }
 
-  document.addEventListener("open-dats", () => { initDats().catch(e => console.error(e)); });
+  // Lazy-init when the DATs tab is shown
+  document.addEventListener("open-dats", () => { initDats().catch(e => console.error("DATs init error:", e)); });
+
+  // If user lands directly on #dats with a hard refresh
   if ((location.hash || "").toLowerCase() === "#dats") {
-    document.addEventListener("DOMContentLoaded", () => { initDats().catch(e => console.error(e)); });
+    document.addEventListener("DOMContentLoaded", () => {
+      initDats().catch(e => console.error("DATs init error:", e));
+    });
   }
 })();
-
-
 
