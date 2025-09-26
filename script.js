@@ -419,13 +419,13 @@ window.__charts = {};
 
   // Map symbols -> CoinGecko IDs (adjust any that differ)
   const CG_IDS = {
-    HYPE:  "hyperliquid",        // verify
+    HYPE:  "hyperliquid",
     SOL:   "solana",
     ETH:   "ethereum",
     BTC:   "bitcoin",
     XAUT:  "tether-gold",
-    PUMP:  "pump",               // verify
-    BERA:  "bera",               // verify
+    PUMP:  "pump",
+    BERA:  "bera",
     IP:    "internet-computer",  // change if your "IP" is different
     TAO:   "bittensor",
     ETHFI: "ether-fi",           // sometimes 'ether-fi-token'
@@ -433,10 +433,8 @@ window.__charts = {};
   };
 
   async function fetchCoinGeckoSeries(id) {
-    // try Pro; if it fails or key missing, fall back to public API
     const proUrl = `https://pro-api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
     const pubUrl = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=1&interval=hourly`;
-
     const headers = CG_API_KEY ? { "x-cg-pro-api-key": CG_API_KEY } : undefined;
 
     async function tryUrl(url, hdrs) {
@@ -451,12 +449,10 @@ window.__charts = {};
       return series.length >= 2 ? series : null;
     }
 
-    // prefer Pro when key exists
     if (CG_API_KEY) {
       const s = await tryUrl(proUrl, headers);
       if (s) return s;
     }
-    // public fallback
     return await tryUrl(pubUrl, undefined);
   }
 
@@ -796,7 +792,6 @@ window.__charts = {};
         .querySelectorAll(".rng").forEach(b => b.classList.toggle("active", b === btn));
       state.range = btn.dataset.range;
 
-      // NOTE: cache is keyed by range, so no need to purge; new keys will be filled automatically
       renderTable();
       updateRelPerfChart();
     });
@@ -828,3 +823,188 @@ window.__charts = {};
     }
   });
 })();
+
+/* =================== DATs (mNAV) module =================== */
+(() => {
+  // Adjust the file paths to match your Artemis outputs (JSON time series).
+  // Expected JSON: { "series": [ { "date": "...", "mnav": 1.23 } ... ] }
+  // If your key is "M_NAV", we'll pick that up automatically.
+  const CARDS = [
+    { symbol: "MSTR", title: "MSTR — mNAV", file: "data/dats/mnav_MSTR.json" },
+    { symbol: "MTPLF", title: "MTPLF — mNAV", file: "data/dats/mnav_MTPLF.json" },
+    { symbol: "SBET", title: "SBET — mNAV", file: "data/dats/mnav_SBET.json" },
+    { symbol: "BMNR", title: "BMNR — mNAV", file: "data/dats/mnav_BMNR.json" },
+    { symbol: "DFDV", title: "DFDV — mNAV", file: "data/dats/mnav_DFDV.json" },
+    { symbol: "UPXI", title: "UPXI — mNAV", file: "data/dats/mnav_UPXI.json" },
+  ];
+
+  const datsState = {
+    inited: false,
+    charts: new Map(),  // symbol -> { chart, series }
+  };
+
+  function normalizeMnav(raw) {
+    const rows = Array.isArray(raw?.series) ? raw.series : (Array.isArray(raw) ? raw : []);
+    const out = [];
+    for (const r of rows) {
+      const d = r.date ?? r.t ?? r.time ?? r.timestamp;
+      const v = r.mnav ?? r.M_NAV ?? r.value ?? r.v;
+      if (!d || v == null || Number.isNaN(+v)) continue;
+
+      // Coerce date to ISO-like string so new Date(...) is safe
+      const iso = typeof d === "string" ? d : new Date(d * 1000).toISOString();
+      out.push({ date: iso, mnav: +v });
+    }
+    out.sort((a,b) => new Date(a.date) - new Date(b.date));
+    return out;
+  }
+
+  function filterMnavRange(series, token) {
+    if (!series.length || token === "ALL") return series;
+    const last = new Date(series[series.length - 1].date);
+    const back = new Date(last);
+    if (token === "3M") back.setMonth(back.getMonth() - 3);
+    else /* 1M default */ back.setMonth(back.getMonth() - 1);
+    return series.filter(r => new Date(r.date) >= back);
+  }
+
+  function mnavPts(rows) {
+    return rows.map(d => ({ x: new Date(d.date), y: d.mnav }));
+  }
+
+  function makeCard({ symbol, title }) {
+    const card = document.createElement("div");
+    card.className = "dat-card";
+    card.id = `dat-${symbol}`;
+
+    card.innerHTML = `
+      <div class="dat-head">
+        <div class="dat-title">${title}</div>
+        <div class="dat-rng" role="group" aria-label="Range">
+          <button class="on" data-range="1M">1M</button>
+          <button data-range="3M">3M</button>
+          <button data-range="ALL">All</button>
+        </div>
+      </div>
+      <canvas class="dat-canvas" id="dat-canvas-${symbol}"></canvas>
+      <div class="dat-note">mNAV = (Price × Shares) ÷ NAV</div>
+    `;
+    return card;
+  }
+
+  async function buildChart(cfg) {
+    // Already built?
+    if (datsState.charts.has(cfg.symbol)) return;
+
+    // Fetch & normalize
+    let raw;
+    try {
+      const res = await fetch(cfg.file, { cache: "no-store" });
+      raw = await res.json();
+    } catch (e) {
+      console.error("DAT fetch failed:", cfg.symbol, e);
+      return;
+    }
+    const series = normalizeMnav(raw);
+    if (!series.length) return;
+
+    // Default range = 1M
+    const initial = filterMnavRange(series, "1M");
+
+    const canvas = document.getElementById(`dat-canvas-${cfg.symbol}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        datasets: [{
+          label: "mNAV",
+          data: mnavPts(initial),
+          borderColor: "#111",
+          backgroundColor: "transparent",
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.25,
+          parsing: true,
+          spanGaps: true
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        interaction: { mode: "index", axis: "x", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            filter: (item) => Number.isFinite(item.parsed?.y),
+            callbacks: {
+              title: (items) => {
+                const ts = items[0].parsed.x ?? items[0].label;
+                return fmtET(new Date(ts), { year:"numeric", month:"short", day:"numeric" });
+              },
+              label: (c) => `mNAV: ${Number(c.parsed.y).toLocaleString(undefined, { maximumFractionDigits: 3 })}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: "time",
+            time: { unit: "day" },
+            ticks: {
+              callback: (value, i, ticks) => {
+                const ts = ticks?.[i]?.value ?? value;
+                return fmtET(new Date(ts), { month:"short", day:"numeric" });
+              }
+            }
+          },
+          y: {
+            ticks: { callback: v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 }) }
+          }
+        }
+      }
+    });
+
+    // Wire range buttons for this card
+    const rng = document.querySelector(`#dat-${cfg.symbol} .dat-rng`);
+    rng?.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-range]");
+      if (!btn) return;
+      rng.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === btn));
+      const token = btn.dataset.range;
+      const subset = filterMnavRange(series, token);
+      chart.data.datasets[0].data = mnavPts(subset);
+      chart.update();
+    });
+
+    datsState.charts.set(cfg.symbol, { chart, series });
+  }
+
+  async function initDats() {
+    if (datsState.inited) return;
+    datsState.inited = true;
+    const grid = document.getElementById("dats-grid");
+    if (!grid) return;
+
+    // Build cards
+    for (const cfg of CARDS) {
+      grid.appendChild(makeCard(cfg));
+    }
+    // Build charts (sequential keeps bandwidth tame; feel free to Promise.all)
+    for (const cfg of CARDS) {
+      await buildChart(cfg);
+    }
+  }
+
+  // Lazy-init when the DATs tab is shown
+  document.addEventListener("open-dats", () => {
+    initDats().catch(e => console.error("DATs init error:", e));
+  });
+
+  // If user lands directly on #dats with a hard refresh
+  if ((location.hash || "").toLowerCase() === "#dats") {
+    document.addEventListener("DOMContentLoaded", () => {
+      initDats().catch(e => console.error("DATs init error:", e));
+    });
+  }
+})();
+
