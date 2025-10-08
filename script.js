@@ -8,6 +8,16 @@ function rgba(hex, a = 0.15) {
 const PRICE_COLOR = "#54d794";     // green
 const RIGHT_COLOR = "#000000";     // black
 
+// --- Safe day parser ---
+// Treat plain "YYYY-MM-DD" as UTC noon to avoid timezone backshift to "yesterday" in US timezones.
+function parseDay(iso) {
+  if (iso == null) return new Date(NaN);
+  if (typeof iso !== "string") return new Date(iso);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(iso + "T12:00:00Z")
+    : new Date(iso);
+}
+
 // --- ET (Eastern Time) formatting helpers ---
 const ET_TZ = "America/New_York";
 const fmtET = (date, opts = {}) =>
@@ -15,7 +25,7 @@ const fmtET = (date, opts = {}) =>
 
 function latestOnOrBefore(rows, key, cutoff) {
   for (let i = rows.length - 1; i >= 0; i--) {
-    const d = new Date(rows[i].date);
+    const d = parseDay(rows[i].date);
     if (d <= cutoff) {
       const v = rows[i][key];
       if (typeof v === "number" && !Number.isNaN(v)) return v;
@@ -38,10 +48,10 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
   const el = document.getElementById(targetId);
   if (!el) return;
 
-  const rows = series.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  const rows = series.slice().sort((a, b) => parseDay(a.date) - parseDay(b.date));
   if (!rows.length) { el.innerHTML = ""; return; }
 
-  const lastDate = new Date(rows[rows.length - 1].date);
+  const lastDate = parseDay(rows[rows.length - 1].date);
   const d7  = new Date(lastDate); d7.setDate(d7.getDate() - 7);
   const d30 = new Date(lastDate); d30.setDate(d30.getDate() - 30);
 
@@ -72,16 +82,16 @@ function renderStatsBox(targetId, series, leftKey, rightKey) {
 /* Range filters for the PUMP charts */
 function filterByRange(series, token) {
   if (token === "ALL") return series;
-  const now = new Date(series[series.length - 1].date);
+  const now = parseDay(series[series.length - 1].date);
   const back = new Date(now);
   if (token === "3M") back.setMonth(back.getMonth() - 3);
   else if (token === "1M") back.setMonth(back.getMonth() - 1);
   else if (token === "1W") back.setDate(back.getDate() - 7);
-  return series.filter(r => new Date(r.date) >= back);
+  return series.filter(r => parseDay(r.date) >= back);
 }
 
 /* Utility: map rows to time points with real Date objects */
-const toPts = (rows, key) => rows.map(d => ({ x: new Date(d.date), y: d[key] }));
+const toPts = (rows, key) => rows.map(d => ({ x: parseDay(d.date), y: d[key] }));
 
 /* Ensure a canvas has fixed height so it can't stretch the page (PUMP only) */
 function pinCanvasHeight(canvas, h = 420) {
@@ -239,8 +249,8 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
       const target = document.getElementById(statsId);
       if (!target || !series.length) return;
 
-      const rows = series.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
-      const last = new Date(rows[rows.length-1].date);
+      const rows = series.slice().sort((a,b) => parseDay(a.date) - parseDay(b.date));
+      const last = parseDay(rows[rows.length-1].date);
       const d7   = new Date(last);  d7.setDate(d7.getDate()-7);
       const d30  = new Date(last);  d30.setDate(d30.getDate()-30);
 
@@ -284,7 +294,7 @@ async function makeBuybacksVsMcap({ el, file, statsId }) {
 
     const pctPts = (rows) =>
       rows.map(d => ({
-        x: new Date(d.date),
+        x: parseDay(d.date),
         y: (typeof d.pct_mcap_bought === "number")
           ? d.pct_mcap_bought
           : (d.cum_buybacks_usd != null && d.mcap_usd != null ? d.cum_buybacks_usd / d.mcap_usd : null)
@@ -850,26 +860,26 @@ window.__charts = {};
     return arr
       .map(r => ({ date: (typeof r.date==="string"?r.date:new Date(r.date*1000).toISOString()), mnav: +r.mnav }))
       .filter(r => r.date && Number.isFinite(r.mnav))
-      .sort((a,b) => new Date(a.date) - new Date(b.date));
+      .sort((a,b) => parseDay(a.date) - parseDay(b.date));
   }
 
   function cropSince(series, isoStart){
     if (!isoStart) return series;
-    const t0 = new Date(isoStart);
-    return series.filter(r => new Date(r.date) >= t0);
+    const t0 = parseDay(isoStart);
+    return series.filter(r => parseDay(r.date) >= t0);
   }
 
   function rangeFilter(series, token){
     if (!series.length || token==="ALL") return series;
-    const last = new Date(series.at(-1).date);
+    const last = parseDay(series.at(-1).date);
     const back = new Date(last);
     if (token==="3M") back.setMonth(back.getMonth()-3);
     else if (token==="1M") back.setMonth(back.getMonth()-1);
     else if (token==="1W") back.setDate(back.getDate()-7);
-    return series.filter(r => new Date(r.date) >= back);
+    return series.filter(r => parseDay(r.date) >= back);
   }
 
-  function toPts(rows){ return rows.map(d => ({ x: new Date(d.date), y: d.mnav })); }
+  function toPts(rows){ return rows.map(d => ({ x: parseDay(d.date), y: d.mnav })); }
 
   function drawNoData(canvas, msg="No data"){
     const ctx = canvas.getContext("2d");
@@ -984,4 +994,3 @@ window.__charts = {};
     document.addEventListener("DOMContentLoaded", () => { initAll().catch(console.error); });
   }
 })();
-
