@@ -1,0 +1,6 @@
+{
+  "series": [
+    { "date": "YYYY-MM-DD", "mnav": 1.234 },
+    { "date": "YYYY-MM-DD", "mnav": 1.211 }
+  ]
+}
