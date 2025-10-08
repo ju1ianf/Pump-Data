@@ -143,7 +143,7 @@
     <!-- DATs -->
     <section id="pane-dats" class="tabpane">
       <h2>mNAV</h2>
-      <p class="muted">Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>. We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI.</p>
+      <p class="muted">Definition used here: <strong>mNAV = (Price × Number of Shares) ÷ NAV</strong>. We show 6 tickers: MSTR, MTPLF, SBET, BMNR, DFDV, UPXI, FORD.</p>
 
       <div class="dat-grid">
         <!-- Repeatable card pattern -->
@@ -167,6 +167,23 @@
           <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
         </div></div><div class="dat-frame"><canvas id="mnav-DFDV"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
 
+        <!-- FORD — mNAV -->
+        <div class="dat-card">
+          <div class="hdr">
+            <h3>FORD — mNAV</h3>
+            <div class="chips" data-for="mnav-FORD">
+              <button class="chip on" data-range="1W">1W</button>
+              <button class="chip" data-range="1M">1M</button>
+              <button class="chip" data-range="3M">3M</button>
+              <button class="chip" data-range="ALL">All</button>
+            </div>
+          </div>
+          <div class="dat-frame">
+            <canvas id="mnav-FORD"></canvas>
+          </div>
+          <div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div>
+        </div>
+        
         <div class="dat-card"><div class="hdr"><h3>UPXI — mNAV</h3><div class="chips" data-for="mnav-UPXI">
           <button class="chip on" data-range="1W">1W</button><button class="chip" data-range="1M">1M</button><button class="chip" data-range="3M">3M</button><button class="chip" data-range="ALL">All</button>
         </div></div><div class="dat-frame"><canvas id="mnav-UPXI"></canvas></div><div class="dat-foot">mNAV = (Price × Shares) ÷ NAV</div></div>
