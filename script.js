@@ -837,23 +837,26 @@ window.__charts = {};
   // Each: { "series": [ { "date": "YYYY-MM-DD", "mnav": <number> }, ... ] }
 
   const FILES = {
-    MSTR: "data/dats/mnav_MSTR.json",
-    MTPLF:"data/dats/mnav_MTPLF.json",
-    SBET: "data/dats/mnav_SBET.json",
-    BMNR: "data/dats/mnav_BMNR.json",
-    DFDV: "data/dats/mnav_DFDV.json",
-    UPXI: "data/dats/mnav_UPXI.json",
-  };
+  MSTR: "data/dats/mnav_MSTR.json",
+  MTPLF:"data/dats/mnav_MTPLF.json",
+  SBET: "data/dats/mnav_SBET.json",
+  BMNR: "data/dats/mnav_BMNR.json",
+  DFDV: "data/dats/mnav_DFDV.json",
+  UPXI: "data/dats/mnav_UPXI.json",
+  FORD: "data/dats/mnav_FORD.json",   // ← add this
+};
 
-  // Hard starts you asked for
-  const STARTS = {
-    MSTR: "2024-04-14",
-    MTPLF:"2025-01-23",
-    SBET: "2025-06-14",
-    BMNR: "2025-06-14",
-    DFDV: "2025-05-22",
-    UPXI: "2025-05-22",
-  };
+// Hard starts you asked for (optional crop)
+const STARTS = {
+  MSTR: "2024-04-14",
+  MTPLF:"2025-01-23",
+  SBET: "2025-06-14",
+  BMNR: "2025-06-14",
+  DFDV: "2025-05-22",
+  UPXI: "2025-05-22",
+  // FORD: "2025-05-22",              // ← optional; include if you want to clip earlier rows
+};
+
 
   function normalize(raw){
     const arr = Array.isArray(raw?.series) ? raw.series : (Array.isArray(raw) ? raw : []);
