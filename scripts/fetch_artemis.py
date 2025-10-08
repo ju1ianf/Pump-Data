@@ -360,6 +360,7 @@ DAT_STARTS = {
     "BMNR": "2025-06-14",
     "DFDV": "2025-05-22",
     "UPXI": "2025-05-22",
+    "FORD": "2025-05-22",   # ← NEW (pick whatever cutover you want)
 }
 
 # Map dashboard symbols -> Artemis symbols (adjust if your Artemis uses different tickers)
@@ -371,7 +372,9 @@ DAT_ARTEMIS_SYMBOLS = {
     "BMNR": os.environ.get("ART_EQ_BMNR", "EQ-BMNR"),
     "DFDV": os.environ.get("ART_EQ_DFDV", "EQ-DFDV"),
     "UPXI": os.environ.get("ART_EQ_UPXI", "EQ-UPXI"),
+    "FORD": os.environ.get("ART_EQ_FORD", "EQ-FORD"),   # ← NEW
 }
+
 
 def fetch_mnav(symbol_dash: str) -> pd.DataFrame:
     """Fetch mNAV from Artemis for a single equity symbol, return DAILY df(date, mnav)."""
